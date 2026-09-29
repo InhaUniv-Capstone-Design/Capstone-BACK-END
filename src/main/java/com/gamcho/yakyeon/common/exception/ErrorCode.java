@@ -10,8 +10,13 @@ public enum ErrorCode {
 
     DUPLICATE_LOGIN_ID(HttpStatus.CONFLICT, "이미 사용 중인 아이디입니다."),
     PASSWORD_MISMATCH(HttpStatus.BAD_REQUEST, "비밀번호와 비밀번호 확인이 일치하지 않습니다."),
-    INVALID_ACCOUNT_TYPE(HttpStatus.BAD_REQUEST, "계정 유형은 SELF 또는 GUARDIAN만 가능합니다."),
-    USER_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 계정입니다.");
+    INVALID_ACCOUNT_TYPE(HttpStatus.BAD_REQUEST, "계정 유형은 PATIENT 또는 GUARDIAN만 가능합니다."),
+    USER_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 계정입니다."),
+
+    // --- 약관 동의 (FR-AUTH-008) ---
+    REQUIRED_TERMS_NOT_AGREED(HttpStatus.BAD_REQUEST, "필수 약관에 모두 동의해야 가입할 수 있습니다."),
+    TERMS_VERSION_OUTDATED(HttpStatus.CONFLICT, "약관 내용이 갱신되었습니다. 최신 약관을 다시 확인해주세요."),
+    TERMS_NOT_CONFIGURED(HttpStatus.INTERNAL_SERVER_ERROR, "약관 데이터가 설정되지 않았습니다. 관리자에게 문의해주세요.");
 
     private final HttpStatus status;
     private final String defaultMessage;

@@ -1,52 +1,99 @@
 package com.gamcho.yakyeon.domain.account.entity;
 
 import jakarta.persistence.*;
-import lombok.*;
-
+import lombok.AccessLevel;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
-import java.time.OffsetDateTime;
+import java.time.LocalDateTime;
 
 /**
- * 문자 인증 — FR-AUTH-009·011·018
+ * 문자 인증 (phone_verification)
+ * FR-AUTH-009, 011, 018
+ *
+ * 보안 주의: codeHash는 인증번호를 해시(SHA-256 등)한 값만 저장.
+ *           평문 인증번호를 DB에 저장하지 말 것.
  */
 @Entity
 @Table(name = "phone_verification")
 @Getter
-@Setter
-@NoArgsConstructor
-@AllArgsConstructor
-@Builder
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class PhoneVerification {
+
+    /** DB CHECK 제약(attempt_count <= 10)과 별개로 서비스 계층에서도 동일 상한을 강제 */
+    private static final short MAX_ATTEMPTS = 10;
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "verification_id")
     private Long verificationId;
 
-    /** DELEGATION, LEGAL_REP, REVOKE */
-    @Column(name = "purpose", length = 20, nullable = false)
-    private String purpose;
-
+    /**
+     * DB 컬럼이 CHAR(64)(bpchar)라서 @JdbcTypeCode(SqlTypes.CHAR)로 JDBC 타입을 명시.
+     * (patient.phone_hash와 동일한 이유 — columnDefinition만으론 스키마 검증을 통과 못 함)
+     */
     @JdbcTypeCode(SqlTypes.CHAR)
-    @Column(name = "phone_hash", length = 64, nullable = false)
+    @Column(name = "phone_hash", nullable = false, length = 64)
     private String phoneHash;
 
-    /** 인증번호 원문이 아닌 해시만 저장 */
-    @Column(name = "code_hash", length = 100, nullable = false)
+    @Enumerated(EnumType.STRING)
+    @Column(name = "purpose", nullable = false, length = 20)
+    private Purpose purpose;
+
+    @Column(name = "code_hash", nullable = false, length = 255)
     private String codeHash;
 
+    @Column(name = "attempt_count", nullable = false)
+    private Short attemptCount;
+
     @Column(name = "expires_at", nullable = false)
-    private OffsetDateTime expiresAt;
+    private LocalDateTime expiresAt;
 
     @Column(name = "verified_at")
-    private OffsetDateTime verifiedAt;
+    private LocalDateTime verifiedAt;
 
-    @Column(name = "attempt_count", nullable = false)
-    @Builder.Default
-    private Short attemptCount = 0;
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private LocalDateTime createdAt;
 
-    @Column(name = "created_at", nullable = false, insertable = false, updatable = false)
-    private OffsetDateTime createdAt;
+    @Builder
+    public PhoneVerification(String phoneHash, Purpose purpose, String codeHash, LocalDateTime expiresAt) {
+        this.phoneHash = phoneHash;
+        this.purpose = purpose;
+        this.codeHash = codeHash;
+        this.expiresAt = expiresAt;
+        this.attemptCount = 0;
+    }
+
+    @PrePersist
+    protected void onCreate() {
+        this.createdAt = LocalDateTime.now();
+    }
+
+    public boolean isExpired() {
+        return LocalDateTime.now().isAfter(expiresAt);
+    }
+
+    public boolean isVerified() {
+        return verifiedAt != null;
+    }
+
+    /** 만료·이미 검증됨·시도 초과가 아니면 시도 가능 */
+    public boolean canAttempt() {
+        return !isExpired() && !isVerified() && attemptCount < MAX_ATTEMPTS;
+    }
+
+    public void increaseAttempt() {
+        this.attemptCount = (short) (this.attemptCount + 1);
+    }
+
+    public void markVerified() {
+        this.verifiedAt = LocalDateTime.now();
+    }
+
+    public enum Purpose {
+        DELEGATION, LEGAL_REP, REVOKE
+    }
 }

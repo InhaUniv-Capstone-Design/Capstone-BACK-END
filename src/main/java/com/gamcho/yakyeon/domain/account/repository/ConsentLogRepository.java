@@ -15,6 +15,11 @@ import java.util.List;
  */
 public interface ConsentLogRepository extends JpaRepository<ConsentLog, Long> {
 
-    /** FR-MY-010: 본인 동의 이력 조회 (최신순) */
-    List<ConsentLog> findByPatient_PatientIdOrderByCreatedAtDesc(Long patientId);
+    /**
+     * FR-MY-010: 본인 동의 이력 조회 (최신순)
+     * consent_log는 탈퇴 후에도 이력이 남도록 patient에 FK를 걸지 않고
+     * patientId를 그냥 Long으로 보관하므로, 연관관계 탐색(Patient_PatientId)이 아니라
+     * 필드명(patientId) 그대로 조회한다. 시각 컬럼명도 createdAt이 아니라 occurredAt이다.
+     */
+    List<ConsentLog> findByPatientIdOrderByOccurredAtDesc(Long patientId);
 }

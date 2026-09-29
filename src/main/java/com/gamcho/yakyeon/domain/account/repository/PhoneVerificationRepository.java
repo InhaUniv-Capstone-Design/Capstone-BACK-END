@@ -12,5 +12,5 @@ public interface PhoneVerificationRepository extends JpaRepository<PhoneVerifica
 
     /** 같은 번호·같은 목적의 가장 최근 인증 시도 조회 (인증번호 확인 시 사용) */
     Optional<PhoneVerification> findTopByPhoneHashAndPurposeOrderByCreatedAtDesc(
-            String phoneHash, String purpose);
+            String phoneHash, PhoneVerification.Purpose purpose);
 }
