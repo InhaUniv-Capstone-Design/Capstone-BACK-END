@@ -3,14 +3,23 @@ package com.gamcho.yakyeon.domain.account.service;
 import com.gamcho.yakyeon.common.exception.BusinessException;
 import com.gamcho.yakyeon.common.exception.ErrorCode;
 import com.gamcho.yakyeon.domain.account.dto.AgreementItem;
+import com.gamcho.yakyeon.domain.account.dto.LoginRequest;
+import com.gamcho.yakyeon.domain.account.dto.LoginResponse;
+import com.gamcho.yakyeon.domain.account.dto.RefreshRequest;
 import com.gamcho.yakyeon.domain.account.dto.SignupRequest;
 import com.gamcho.yakyeon.domain.account.entity.AppUser;
+import com.gamcho.yakyeon.domain.account.entity.AuthToken;
 import com.gamcho.yakyeon.domain.account.entity.TermsVersion;
 import com.gamcho.yakyeon.domain.account.entity.UserAgreement;
 import com.gamcho.yakyeon.domain.account.repository.AppUserRepository;
+import com.gamcho.yakyeon.domain.account.repository.AuthTokenRepository;
 import com.gamcho.yakyeon.domain.account.repository.TermsVersionRepository;
 import com.gamcho.yakyeon.domain.account.repository.UserAgreementRepository;
+import com.gamcho.yakyeon.security.RefreshTokenGenerator;
+import com.gamcho.yakyeon.security.TokenHasher;
+import com.gamcho.yakyeon.security.jwt.JwtTokenProvider;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,11 +34,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class AuthService {
 
-    /**
-     * 회원가입 시점에 확인하는 약관 종류.
-     * DELEGATION/LEGAL_REP은 보호자 연동(guardian_link) 단계에서 별도로 동의를 받으므로
-     * 여기서는 다루지 않는다.
-     */
+    /** 회원가입 시점에 확인하는 약관 종류 (DELEGATION/LEGAL_REP은 보호자 연동 단계에서 별도 처리) */
     private static final List<TermsVersion.TermsType> SIGNUP_TERMS_TYPES = List.of(
             TermsVersion.TermsType.TOS,
             TermsVersion.TermsType.PRIVACY,
@@ -40,16 +45,17 @@ public class AuthService {
     private final AppUserRepository appUserRepository;
     private final TermsVersionRepository termsVersionRepository;
     private final UserAgreementRepository userAgreementRepository;
+    private final AuthTokenRepository authTokenRepository;
     private final PasswordEncoder passwordEncoder;
+    private final JwtTokenProvider jwtTokenProvider;
+    private final RefreshTokenGenerator refreshTokenGenerator;
+    private final TokenHasher tokenHasher;
 
-    /**
-     * FR-AUTH-001~003, FR-AUTH-008: 회원가입
-     * 1) 비밀번호/비밀번호확인 일치 확인
-     * 2) 아이디 중복 확인 (활성 계정 기준 - 탈퇴 계정의 아이디는 재사용 가능해야 함)
-     * 3) 필수 약관(TOS/PRIVACY/SENSITIVE_HEALTH/SERVICE_NOTICE) 전부 동의했는지 확인
-     * 4) 비밀번호 해시 후 계정 저장 (평문은 절대 저장하지 않음, NFR-SEC-001)
-     * 5) 약관 동의 내역(user_agreement) 저장
-     */
+    @Value("${jwt.refresh-token-expiration-seconds:1209600}")
+    private long refreshTokenExpirationSeconds;
+
+    // ==================== 회원가입 ====================
+
     @Transactional
     public Long signup(SignupRequest request) {
         if (!request.getPassword().equals(request.getPasswordConfirm())) {
@@ -59,7 +65,6 @@ public class AuthService {
             throw new BusinessException(ErrorCode.DUPLICATE_LOGIN_ID);
         }
 
-        // 계정을 만들기 전에 약관 동의부터 검증한다 - 검증 실패 시 계정이 생기지 않도록.
         List<AgreementPlan> agreementPlan = resolveAgreementPlan(request.getAgreements());
 
         AppUser user = AppUser.builder()
@@ -87,13 +92,6 @@ public class AuthService {
         return !appUserRepository.existsByLoginIdAndDeletedAtIsNull(loginId);
     }
 
-    /**
-     * 회원가입 시점의 "현재 시행 중인 최신 약관 버전" 기준으로 요청 내용을 검증한다.
-     * - 필수 약관인데 동의 항목이 아예 없거나 agreed=false면 REQUIRED_TERMS_NOT_AGREED
-     * - 필수 약관인데 클라이언트가 들고 있는 버전이 이미 지난 버전이면 TERMS_VERSION_OUTDATED
-     *   (동의 화면을 새로고침해서 최신 버전으로 다시 동의받아야 함)
-     * - 선택 약관은 동의 항목이 없으면 그냥 건너뜀 (거부로 기록하지 않음)
-     */
     private List<AgreementPlan> resolveAgreementPlan(List<AgreementItem> submitted) {
         Map<Long, AgreementItem> submittedById = submitted.stream()
                 .collect(Collectors.toMap(AgreementItem::termsVersionId, item -> item, (a, b) -> a));
@@ -115,7 +113,7 @@ public class AuthService {
 
             if (matched == null) {
                 if (!Boolean.TRUE.equals(latest.getIsRequired())) {
-                    continue; // 선택 약관 무응답 - 기록하지 않고 넘어감
+                    continue;
                 }
                 boolean referencesStaleVersionOfSameType = submittedVersions.values().stream()
                         .anyMatch(tv -> tv.getTermsType() == type
@@ -133,6 +131,91 @@ public class AuthService {
         }
 
         return plan;
+    }
+
+    // ==================== 로그인 / 토큰 ====================
+
+    /**
+     * FR-AUTH-005~007: 로그인
+     * 실패 횟수 잠금 정책은 적용하지 않기로 함(단순 아이디/비밀번호 검증만 수행).
+     */
+    @Transactional
+    public LoginResponse login(LoginRequest request) {
+        AppUser user = appUserRepository.findByLoginIdAndDeletedAtIsNull(request.getLoginId())
+                .orElseThrow(() -> new BusinessException(ErrorCode.INVALID_CREDENTIALS));
+
+        if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
+            throw new BusinessException(ErrorCode.INVALID_CREDENTIALS);
+        }
+
+        user.recordSuccessfulLogin();
+
+        return issueTokens(user);
+    }
+
+    /**
+     * FR-AUTH-006: Refresh Token으로 Access Token 재발급.
+     * 매번 회전(rotation)한다 - 기존 Refresh Token은 1회용으로 즉시 폐기하고 새 걸 내준다.
+     * 이미 폐기된(=한 번 쓰인) 토큰이 다시 들어오면 탈취로 의심하고 해당 유저의
+     * 모든 세션(Refresh Token)을 무효화한다.
+     */
+    /**
+     * noRollbackFor 필요: 재사용이 감지되면 revokeAllTokensFor()로 전체 토큰을 폐기한 뒤
+     * BusinessException을 던지는데, 기본 @Transactional이면 예외 발생 시 트랜잭션이 롤백되면서
+     * 방금 처리한 "전체 폐기"까지 같이 없었던 일이 돼버린다 (실제로 테스트에서 이 버그로 걸림 -
+     * 재사용된 토큰만 막히고 다른 토큰은 여전히 살아있는 상태가 나왔었음).
+     */
+    @Transactional(noRollbackFor = BusinessException.class)
+    public LoginResponse refresh(RefreshRequest request) {
+        String hash = tokenHasher.sha256Hex(request.getRefreshToken());
+        AuthToken token = authTokenRepository.findByTokenHash(hash)
+                .orElseThrow(() -> new BusinessException(ErrorCode.INVALID_REFRESH_TOKEN));
+
+        if (token.getRevokedAt() != null) {
+            revokeAllTokensFor(token.getUser().getUserId());
+            throw new BusinessException(ErrorCode.REFRESH_TOKEN_REUSED);
+        }
+        if (!token.isValid()) {
+            throw new BusinessException(ErrorCode.INVALID_REFRESH_TOKEN);
+        }
+
+        AppUser user = token.getUser();
+        token.revoke();
+
+        return issueTokens(user);
+    }
+
+    /** FR-AUTH-006: 로그아웃 - 전달받은 Refresh Token 하나만 폐기. 멱등하게 처리(이미 없어도 에러 아님). */
+    @Transactional
+    public void logout(RefreshRequest request) {
+        String hash = tokenHasher.sha256Hex(request.getRefreshToken());
+        authTokenRepository.findByTokenHash(hash).ifPresent(AuthToken::revoke);
+    }
+
+    private LoginResponse issueTokens(AppUser user) {
+        String accessToken = jwtTokenProvider.createAccessToken(user);
+        String rawRefreshToken = refreshTokenGenerator.generate();
+
+        AuthToken token = AuthToken.builder()
+                .user(user)
+                .tokenHash(tokenHasher.sha256Hex(rawRefreshToken))
+                .expiresAt(LocalDateTime.now().plusSeconds(refreshTokenExpirationSeconds))
+                .build();
+        authTokenRepository.save(token);
+
+        return new LoginResponse(
+                accessToken,
+                rawRefreshToken,
+                "Bearer",
+                jwtTokenProvider.getAccessTokenExpirationSeconds(),
+                user.getUserId(),
+                user.getAccountType().name()
+        );
+    }
+
+    private void revokeAllTokensFor(Long userId) {
+        authTokenRepository.findByUser_UserIdAndRevokedAtIsNull(userId)
+                .forEach(AuthToken::revoke);
     }
 
     private record AgreementPlan(TermsVersion termsVersion, Boolean agreed) {

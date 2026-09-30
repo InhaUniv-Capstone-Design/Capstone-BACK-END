@@ -1,4 +1,6 @@
 spring:
+  config:
+    import: optional:application-local.yml
   application:
     name: yakyeon
   datasource:
@@ -12,6 +14,11 @@ spring:
     properties:
       hibernate:
         format_sql: true
+
+jwt:
+  secret: ${JWT_SECRET:CHANGE_ME_최소32바이트이상의랜덤문자열로교체하세요1234567890}
+  access-token-expiration-seconds: 1800
+  refresh-token-expiration-seconds: 1209600
 
 server:
   port: 8080

@@ -16,7 +16,13 @@ public enum ErrorCode {
     // --- 약관 동의 (FR-AUTH-008) ---
     REQUIRED_TERMS_NOT_AGREED(HttpStatus.BAD_REQUEST, "필수 약관에 모두 동의해야 가입할 수 있습니다."),
     TERMS_VERSION_OUTDATED(HttpStatus.CONFLICT, "약관 내용이 갱신되었습니다. 최신 약관을 다시 확인해주세요."),
-    TERMS_NOT_CONFIGURED(HttpStatus.INTERNAL_SERVER_ERROR, "약관 데이터가 설정되지 않았습니다. 관리자에게 문의해주세요.");
+    TERMS_NOT_CONFIGURED(HttpStatus.INTERNAL_SERVER_ERROR, "약관 데이터가 설정되지 않았습니다. 관리자에게 문의해주세요."),
+
+    // --- 로그인/토큰 (FR-AUTH-005~007) ---
+    /** 아이디가 없거나 비밀번호가 틀렸거나 - 둘을 구분해서 알려주지 않는다 (계정 존재 여부 비노출) */
+    INVALID_CREDENTIALS(HttpStatus.UNAUTHORIZED, "아이디 또는 비밀번호가 올바르지 않습니다."),
+    INVALID_REFRESH_TOKEN(HttpStatus.UNAUTHORIZED, "유효하지 않거나 만료된 토큰입니다. 다시 로그인해주세요."),
+    REFRESH_TOKEN_REUSED(HttpStatus.UNAUTHORIZED, "비정상적인 접근이 감지되어 모든 로그인이 종료되었습니다. 다시 로그인해주세요.");
 
     private final HttpStatus status;
     private final String defaultMessage;
