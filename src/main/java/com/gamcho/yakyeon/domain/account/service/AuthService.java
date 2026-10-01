@@ -2,9 +2,11 @@ package com.gamcho.yakyeon.domain.account.service;
 
 import com.gamcho.yakyeon.common.exception.BusinessException;
 import com.gamcho.yakyeon.common.exception.ErrorCode;
+import com.gamcho.yakyeon.domain.account.dto.AccountDeleteRequest;
 import com.gamcho.yakyeon.domain.account.dto.AgreementItem;
 import com.gamcho.yakyeon.domain.account.dto.LoginRequest;
 import com.gamcho.yakyeon.domain.account.dto.LoginResponse;
+import com.gamcho.yakyeon.domain.account.dto.PasswordChangeRequest;
 import com.gamcho.yakyeon.domain.account.dto.RefreshRequest;
 import com.gamcho.yakyeon.domain.account.dto.SignupRequest;
 import com.gamcho.yakyeon.domain.account.entity.AppUser;
@@ -190,6 +192,50 @@ public class AuthService {
     public void logout(RefreshRequest request) {
         String hash = tokenHasher.sha256Hex(request.getRefreshToken());
         authTokenRepository.findByTokenHash(hash).ifPresent(AuthToken::revoke);
+    }
+
+    // ==================== 비밀번호 변경 / 계정 삭제 ====================
+
+    /**
+     * 비밀번호 변경. 현재 비밀번호를 재확인한 뒤에만 허용한다.
+     * 변경 성공 시 다른 기기에 남아있던 세션(Refresh Token)을 전부 폐기한다 -
+     * 비밀번호를 바꾼 이유가 "계정이 털린 것 같아서"일 수 있는데, 그 상태에서
+     * 공격자의 세션이 계속 살아있으면 비밀번호 변경이 의미가 없어진다.
+     */
+    @Transactional
+    public void changePassword(Long userId, PasswordChangeRequest request) {
+        if (!request.getNewPassword().equals(request.getNewPasswordConfirm())) {
+            throw new BusinessException(ErrorCode.PASSWORD_MISMATCH);
+        }
+
+        AppUser user = appUserRepository.findByUserIdAndDeletedAtIsNull(userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+
+        if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPasswordHash())) {
+            throw new BusinessException(ErrorCode.CURRENT_PASSWORD_MISMATCH);
+        }
+
+        user.changePassword(passwordEncoder.encode(request.getNewPassword()));
+        revokeAllTokensFor(userId);
+    }
+
+    /**
+     * 계정 삭제(탈퇴) - 논리 삭제(app_user.status=DELETED, deleted_at 기록)만 수행한다.
+     * 물리 삭제를 하지 않는 이유는 지난번 DB 설계 논의에서 정리한 그대로다:
+     * 탈퇴 후에도 남아야 하는 법적 근거 데이터(동의 이력 등)가 FK 연쇄로 같이
+     * 사라지는 걸 막기 위함.
+     */
+    @Transactional
+    public void deleteAccount(Long userId, AccountDeleteRequest request) {
+        AppUser user = appUserRepository.findByUserIdAndDeletedAtIsNull(userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+
+        if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
+            throw new BusinessException(ErrorCode.CURRENT_PASSWORD_MISMATCH);
+        }
+
+        user.softDelete();
+        revokeAllTokensFor(userId);
     }
 
     private LoginResponse issueTokens(AppUser user) {

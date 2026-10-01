@@ -1,8 +1,10 @@
 package com.gamcho.yakyeon.domain.account.controller;
 
+import com.gamcho.yakyeon.domain.account.dto.AccountDeleteRequest;
 import com.gamcho.yakyeon.domain.account.dto.CheckIdResponse;
 import com.gamcho.yakyeon.domain.account.dto.LoginRequest;
 import com.gamcho.yakyeon.domain.account.dto.LoginResponse;
+import com.gamcho.yakyeon.domain.account.dto.PasswordChangeRequest;
 import com.gamcho.yakyeon.domain.account.dto.RefreshRequest;
 import com.gamcho.yakyeon.domain.account.dto.SignupRequest;
 import com.gamcho.yakyeon.domain.account.dto.SignupResponse;
@@ -11,14 +13,15 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 /**
  * REST API 명세 §1
- *
- * ⚠️ 이 파일은 기존 AuthController에 로그인/리프레시/로그아웃 3개 엔드포인트를 추가한 재구성본입니다.
- * 실제 프로젝트의 signup/check-id 메서드 내용(특히 import, 응답 상태코드)이 이것과 다르면
- * 기존 파일을 기준으로 두고 login/refresh/logout 3개 메서드만 옮겨 붙이세요.
+ * changePassword/deleteAccount는 @AuthenticationPrincipal Long userId로 로그인한
+ * 사용자의 ID를 받는다 - JwtAuthenticationFilter가 SecurityContext에 세팅해준 값이다.
+ * SecurityConfig에서 이 두 경로는 "/auth/**" permitAll 범위에서 빠져있어야
+ * 인증 없이 호출되는 걸 막을 수 있다 (SecurityConfig도 같이 갱신했으니 확인할 것).
  */
 @RestController
 @RequestMapping("/auth")
@@ -55,6 +58,24 @@ public class AuthController {
     @PostMapping("/logout")
     public ResponseEntity<Void> logout(@Valid @RequestBody RefreshRequest request) {
         authService.logout(request);
+        return ResponseEntity.noContent().build();
+    }
+
+    /** 비밀번호 변경 - 로그인 필요 */
+    @PatchMapping("/password")
+    public ResponseEntity<Void> changePassword(
+            @AuthenticationPrincipal Long userId,
+            @Valid @RequestBody PasswordChangeRequest request) {
+        authService.changePassword(userId, request);
+        return ResponseEntity.noContent().build();
+    }
+
+    /** 계정 삭제(탈퇴) - 로그인 필요, 비밀번호 재확인 */
+    @DeleteMapping("/account")
+    public ResponseEntity<Void> deleteAccount(
+            @AuthenticationPrincipal Long userId,
+            @Valid @RequestBody AccountDeleteRequest request) {
+        authService.deleteAccount(userId, request);
         return ResponseEntity.noContent().build();
     }
 }

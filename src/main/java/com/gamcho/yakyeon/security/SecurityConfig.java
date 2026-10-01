@@ -4,6 +4,7 @@ import com.gamcho.yakyeon.security.jwt.JwtAuthenticationFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -15,6 +16,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -25,8 +27,11 @@ public class SecurityConfig {
                 .formLogin(AbstractHttpConfigurer::disable)
                 // 세션을 만들지 않는다 - 모든 인증 상태는 매 요청의 Access Token으로만 판단(무상태)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .exceptionHandling(ex -> ex.authenticationEntryPoint(jwtAuthenticationEntryPoint))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/auth/**").permitAll()
+                        // 공개 엔드포인트만 명시적으로 허용 - "/auth/**" 블랭킷 허용 금지
+                        .requestMatchers(HttpMethod.POST, "/auth/signup", "/auth/login", "/auth/refresh", "/auth/logout").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/auth/check-id").permitAll()
                         // 앞으로 patient/medication 등 새 컨트롤러를 추가해도 기본은 "인증 필요" -
                         // 개별 엔드포인트를 열어주려면 여기에 명시적으로 추가해야 하므로,
                         // "깜빡하고 인증 없이 노출"되는 실수를 구조적으로 막는다.

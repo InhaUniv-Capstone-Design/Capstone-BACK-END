@@ -20,4 +20,10 @@ public interface AppUserRepository extends JpaRepository<AppUser, Long> {
 
     /** 회원가입 시 아이디 중복 확인 — 활성 계정 기준 */
     boolean existsByLoginIdAndDeletedAtIsNull(String loginId);
+
+    /**
+     * 비밀번호 변경·계정 삭제 시 사용 — 토큰 발급 이후 다른 세션에서 이미 탈퇴 처리된
+     * 계정이 남은 Access Token으로 또 접근하는 걸 막기 위해 deletedAt 조건을 같이 건다.
+     */
+    Optional<AppUser> findByUserIdAndDeletedAtIsNull(Long userId);
 }
