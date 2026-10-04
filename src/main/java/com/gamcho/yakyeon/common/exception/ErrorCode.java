@@ -28,7 +28,29 @@ public enum ErrorCode {
     CURRENT_PASSWORD_MISMATCH(HttpStatus.UNAUTHORIZED, "현재 비밀번호가 올바르지 않습니다."),
 
     // --- 복약자 등록 (FR-AUTH-009, 011, 018) ---
-    PATIENT_ALREADY_REGISTERED(HttpStatus.CONFLICT, "이미 본인 복약자 프로필이 등록되어 있습니다.");
+    PATIENT_ALREADY_REGISTERED(HttpStatus.CONFLICT, "이미 본인 복약자 프로필이 등록되어 있습니다."),
+    PATIENT_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 복약자입니다."),
+    INVALID_PHONE_FORMAT(HttpStatus.BAD_REQUEST, "휴대폰 번호 형식이 올바르지 않습니다. (예: 01012345678)"),
+
+    // --- 보호자 대리 동의 (FR-AUTH-009~015) ---
+    GUARDIAN_ONLY(HttpStatus.FORBIDDEN, "보호자(GUARDIAN) 계정만 사용할 수 있는 기능입니다."),
+    GUARDIAN_LINK_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 연동 요청입니다."),
+    GUARDIAN_LINK_ALREADY_EXISTS(HttpStatus.CONFLICT, "이미 대기 중이거나 연동된 요청이 있습니다."),
+    GUARDIAN_LINK_NOT_PENDING(HttpStatus.CONFLICT, "동의 대기 중인 연동 요청이 아닙니다."),
+    GUARDIAN_LINK_NOT_ACTIVE(HttpStatus.CONFLICT, "연동 중인 상태가 아닙니다."),
+    PERMISSION_UPGRADE_FORBIDDEN(HttpStatus.FORBIDDEN, "권한 범위를 넓히는 것은 복약자 본인만 할 수 있습니다."),
+
+    // --- 문자 인증 ---
+    LEGAL_REP_PHONE_REQUIRED(HttpStatus.BAD_REQUEST, "만 14세 미만 복약자는 법정대리인 휴대폰 번호가 필요합니다."),
+    LEGAL_REP_NAME_REQUIRED(HttpStatus.BAD_REQUEST, "만 14세 미만 복약자는 동의 시 법정대리인 이름이 필요합니다."),
+    LEGAL_REP_PHONE_SAME_AS_PATIENT(HttpStatus.BAD_REQUEST, "법정대리인 휴대폰 번호는 복약자 본인 번호와 달라야 합니다."),
+    VERIFICATION_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 인증 요청입니다."),
+    VERIFICATION_EXPIRED(HttpStatus.BAD_REQUEST, "인증 시간이 만료되었습니다. 인증번호를 다시 요청해주세요."),
+    VERIFICATION_ATTEMPTS_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS, "인증번호 입력 가능 횟수를 초과했습니다. 인증번호를 다시 요청해주세요."),
+    VERIFICATION_RATE_LIMITED(HttpStatus.TOO_MANY_REQUESTS, "인증번호 요청이 너무 많습니다. 잠시 후 다시 시도해주세요."),
+    VERIFICATION_REQUIRED(HttpStatus.BAD_REQUEST, "동의하려면 문자 인증이 필요합니다."),
+    VERIFICATION_NOT_COMPLETED(HttpStatus.BAD_REQUEST, "문자 인증이 완료되지 않았습니다."),
+    VERIFICATION_PURPOSE_MISMATCH(HttpStatus.BAD_REQUEST, "이 동의에 사용할 수 없는 인증입니다.");
 
     private final HttpStatus status;
     private final String defaultMessage;

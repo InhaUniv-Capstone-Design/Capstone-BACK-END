@@ -76,6 +76,14 @@ public class GuardianLink {
         this.status = LinkStatus.REJECTED;
     }
 
+    /**
+     * 권한 범위 변경. "누가 올릴 수 있는가" 같은 규칙은 여기서 판단하지 않는다 -
+     * 호출하는 서비스(GuardianLinkService)가 호출자를 확인한 뒤에만 부른다.
+     */
+    public void changePermissionScope(PermissionScope newScope) {
+        this.permissionScope = newScope;
+    }
+
     public void revoke() {
         this.status = LinkStatus.REVOKED;
         this.revokedAt = LocalDateTime.now();

@@ -92,10 +92,12 @@ CREATE TABLE phone_verification (
     attempt_count   SMALLINT NOT NULL DEFAULT 0,
     expires_at      TIMESTAMPTZ NOT NULL,
     verified_at     TIMESTAMPTZ,
+    link_id         BIGINT,      -- 이 인증이 속한 guardian_link (FK 없음). 다른 보호자의 인증 가로채기 방지
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
     CHECK (attempt_count <= 10)  -- 무차별 대입 방지 상한(값은 팀 정책에 맞게 조정)
 );
 CREATE INDEX idx_phone_verification_hash ON phone_verification(phone_hash, purpose);
+CREATE INDEX idx_phone_verification_link ON phone_verification(link_id);
 
 -- 1-7. guardian_link
 CREATE TABLE guardian_link (
