@@ -25,8 +25,10 @@ public enum ErrorCode {
     REFRESH_TOKEN_REUSED(HttpStatus.UNAUTHORIZED, "비정상적인 접근이 감지되어 모든 로그인이 종료되었습니다. 다시 로그인해주세요."),
 
     // --- 비밀번호 변경 / 계정 삭제 ---
-    /** 로그인 실패(INVALID_CREDENTIALS)와 구분 - 이미 로그인된 상태에서의 재확인 실패이므로 메시지를 다르게 둔다 */
-    CURRENT_PASSWORD_MISMATCH(HttpStatus.UNAUTHORIZED, "현재 비밀번호가 올바르지 않습니다.");
+    CURRENT_PASSWORD_MISMATCH(HttpStatus.UNAUTHORIZED, "현재 비밀번호가 올바르지 않습니다."),
+
+    // --- 복약자 등록 (FR-AUTH-009, 011, 018) ---
+    PATIENT_ALREADY_REGISTERED(HttpStatus.CONFLICT, "이미 본인 복약자 프로필이 등록되어 있습니다.");
 
     private final HttpStatus status;
     private final String defaultMessage;

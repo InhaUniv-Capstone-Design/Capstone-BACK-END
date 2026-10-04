@@ -20,6 +20,9 @@ jwt:
   access-token-expiration-seconds: 1800
   refresh-token-expiration-seconds: 1209600
 
+encryption:
+  phone-key: ${PHONE_ENCRYPTION_KEY:}
+
 server:
   port: 8080
 
