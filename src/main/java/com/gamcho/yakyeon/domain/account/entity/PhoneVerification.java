@@ -56,11 +56,11 @@ public class PhoneVerification {
     private LocalDateTime verifiedAt;
 
     /**
-     * 이 인증이 속한 보호자 연동 요청(guardian_link.link_id). FK는 없음(이력성 데이터).
+     * 이 인증이 속한 보호자 연동 요청(guardian_link.link_id). 팀 스키마에서 NOT NULL + FK(CASCADE)다.
      * 인증을 특정 연동 요청에 묶어서, 다른 보호자가 남의 verification_id로
      * 자기 동의를 승인받는 걸 막는다.
      */
-    @Column(name = "link_id")
+    @Column(name = "link_id", nullable = false)
     private Long linkId;
 
     @Column(name = "created_at", nullable = false, updatable = false)

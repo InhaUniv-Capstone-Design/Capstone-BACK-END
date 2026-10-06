@@ -22,6 +22,8 @@ import com.gamcho.yakyeon.security.TokenHasher;
 import com.gamcho.yakyeon.security.jwt.JwtTokenProvider;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.PreparedStatementCallback;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -52,6 +54,7 @@ public class AuthService {
     private final JwtTokenProvider jwtTokenProvider;
     private final RefreshTokenGenerator refreshTokenGenerator;
     private final TokenHasher tokenHasher;
+    private final JdbcTemplate jdbcTemplate;
 
     @Value("${jwt.refresh-token-expiration-seconds:1209600}")
     private long refreshTokenExpirationSeconds;
@@ -91,6 +94,10 @@ public class AuthService {
     /** FR-AUTH-002: 아이디 중복 검사 (활성 계정 기준) */
     @Transactional(readOnly = true)
     public boolean isLoginIdAvailable(String loginId) {
+        // '#'로 시작하는 아이디는 탈퇴 계정용으로 예약돼 있어 가입할 수 없다 (DB CHECK 제약)
+        if (loginId.startsWith("#")) {
+            return false;
+        }
         return !appUserRepository.existsByLoginIdAndDeletedAtIsNull(loginId);
     }
 
@@ -174,15 +181,23 @@ public class AuthService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.INVALID_REFRESH_TOKEN));
 
         if (token.getRevokedAt() != null) {
-            revokeAllTokensFor(token.getUser().getUserId());
-            throw new BusinessException(ErrorCode.REFRESH_TOKEN_REUSED);
+            // 폐기 사유로 구분한다: 재발급(ROTATED)으로 이미 한 번 쓰인 토큰이 또 들어온 경우만
+            // 탈취 의심으로 보고 전체 세션을 끊는다. 로그아웃·비밀번호 변경·탈퇴로 폐기된 토큰은
+            // 그냥 무효 토큰이다 (이걸 전부 탈취로 취급하면, 로그아웃한 옛 토큰을 누가 보내기만 해도
+            // 그 계정의 모든 기기가 로그아웃되어 버린다).
+            if (token.getRevokeReason() == AuthToken.RevokeReason.ROTATED) {
+                revokeAllTokensFor(token.getUser().getUserId(), AuthToken.RevokeReason.SECURITY);
+                throw new BusinessException(ErrorCode.REFRESH_TOKEN_REUSED);
+            }
+            throw new BusinessException(ErrorCode.INVALID_REFRESH_TOKEN);
         }
         if (!token.isValid()) {
             throw new BusinessException(ErrorCode.INVALID_REFRESH_TOKEN);
         }
 
         AppUser user = token.getUser();
-        token.revoke();
+        token.markUsed();
+        token.revoke(AuthToken.RevokeReason.ROTATED);
 
         return issueTokens(user);
     }
@@ -191,7 +206,8 @@ public class AuthService {
     @Transactional
     public void logout(RefreshRequest request) {
         String hash = tokenHasher.sha256Hex(request.getRefreshToken());
-        authTokenRepository.findByTokenHash(hash).ifPresent(AuthToken::revoke);
+        authTokenRepository.findByTokenHash(hash)
+                .ifPresent(t -> t.revoke(AuthToken.RevokeReason.LOGOUT));
     }
 
     // ==================== 비밀번호 변경 / 계정 삭제 ====================
@@ -216,7 +232,7 @@ public class AuthService {
         }
 
         user.changePassword(passwordEncoder.encode(request.getNewPassword()));
-        revokeAllTokensFor(userId);
+        revokeAllTokensFor(userId, AuthToken.RevokeReason.PASSWORD_CHANGE);
     }
 
     /**
@@ -234,8 +250,15 @@ public class AuthService {
             throw new BusinessException(ErrorCode.CURRENT_PASSWORD_MISMATCH);
         }
 
-        user.softDelete();
-        revokeAllTokensFor(userId);
+        // 탈퇴는 팀 DB 함수가 한 번에 처리한다: 아이디를 '#deleted#번호'로 바꾸고 비밀번호 파기,
+        // 토큰 폐기(WITHDRAWAL), 푸시 토큰 삭제, 보호자 연동 해제 + 동의 이력(REVOKE),
+        // 본인 복약자 정보 파기까지. 행은 남기고 보관 기간 뒤에 purge_withdrawn()으로 최종 삭제한다.
+        // 반환값이 없는 함수라 executeUpdate가 아닌 execute로 호출한다 (SELECT 결과 행을 무시).
+        jdbcTemplate.execute("SELECT withdraw_user(?)", (PreparedStatementCallback<Void>) ps -> {
+            ps.setLong(1, userId);
+            ps.execute();
+            return null;
+        });
     }
 
     private LoginResponse issueTokens(AppUser user) {
@@ -259,9 +282,9 @@ public class AuthService {
         );
     }
 
-    private void revokeAllTokensFor(Long userId) {
+    private void revokeAllTokensFor(Long userId, AuthToken.RevokeReason reason) {
         authTokenRepository.findByUser_UserIdAndRevokedAtIsNull(userId)
-                .forEach(AuthToken::revoke);
+                .forEach(t -> t.revoke(reason));
     }
 
     private record AgreementPlan(TermsVersion termsVersion, Boolean agreed) {

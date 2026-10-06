@@ -61,7 +61,8 @@ public class GuardianLinkService {
             throw new BusinessException(ErrorCode.INVALID_PHONE_FORMAT);
         }
 
-        return patientRepository.findAllByPhoneHash(tokenHasher.sha256Hex(phone)).stream()
+        return patientRepository
+                .findAllByPhoneHashAndStatus(tokenHasher.sha256Hex(phone), Patient.PatientStatus.ACTIVE).stream()
                 .map(p -> new PatientSearchResponse(p.getPatientId(), maskName(p.getName()), p.getUser() != null))
                 .toList();
     }
@@ -71,7 +72,8 @@ public class GuardianLinkService {
     public GuardianLinkResponse createLink(Long userId, Long patientId) {
         AppUser guardian = guardianAccessChecker.requireGuardian(userId);
 
-        Patient patient = patientRepository.findById(patientId)
+        // 탈퇴한 복약자(DELETED)에게는 연동 요청을 만들 수 없다
+        Patient patient = patientRepository.findByPatientIdAndStatus(patientId, Patient.PatientStatus.ACTIVE)
                 .orElseThrow(() -> new BusinessException(ErrorCode.PATIENT_NOT_FOUND));
 
         boolean alreadyOpen = guardianLinkRepository

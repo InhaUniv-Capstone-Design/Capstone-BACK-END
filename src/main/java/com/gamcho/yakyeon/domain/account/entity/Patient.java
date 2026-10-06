@@ -59,6 +59,17 @@ public class Patient {
     @JoinColumn(name = "created_by_user_id")
     private AppUser createdBy;
 
+    /**
+     * 복약자 상태 (팀 스키마). 탈퇴하면 DB 함수 withdraw_patient()가 DELETED로 바꾸고
+     * 이름·생년월일·전화번호를 파기(NULL)한다. 조회할 때는 항상 ACTIVE 조건을 붙여야 한다.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false, length = 10)
+    private PatientStatus status;
+
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -70,6 +81,7 @@ public class Patient {
         this.phoneEnc = phoneEnc;
         this.phoneHash = phoneHash;
         this.createdBy = createdBy;
+        this.status = PatientStatus.ACTIVE;
     }
 
     @PrePersist
@@ -79,11 +91,20 @@ public class Patient {
 
     /** 만 14세 미만 여부 - 법정대리인 동의 대상 판단 (FR-AUTH 관련) */
     public boolean isUnder14() {
-        return birthDate.plusYears(14).isAfter(LocalDate.now());
+        // 탈퇴한 복약자는 생년월일이 파기(NULL)돼 있다
+        return birthDate != null && birthDate.plusYears(14).isAfter(LocalDate.now());
+    }
+
+    public boolean isActive() {
+        return status == PatientStatus.ACTIVE;
     }
 
     public void linkAppUser(AppUser user) {
         this.user = user;
+    }
+
+    public enum PatientStatus {
+        ACTIVE, DELETED
     }
 
     @Override

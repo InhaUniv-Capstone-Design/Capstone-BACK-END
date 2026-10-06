@@ -6,6 +6,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.Getter;
 
@@ -29,6 +30,8 @@ public class SignupRequest {
     @JsonProperty("login_id")
     @NotBlank(message = "아이디를 입력해주세요.")
     @Size(min = 4, max = 30, message = "아이디는 4~30자여야 합니다.")
+    // 팀 DB는 '#'로 시작하는 아이디를 탈퇴 계정용으로 예약해 둔다 (CHECK 제약) - 가입 단계에서 미리 막는다
+    @Pattern(regexp = "^[^#].*$", message = "아이디는 #으로 시작할 수 없습니다.")
     private String loginId;
 
     @JsonProperty("password")
