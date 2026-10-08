@@ -39,6 +39,7 @@ public enum ErrorCode {
     GUARDIAN_LINK_NOT_PENDING(HttpStatus.CONFLICT, "동의 대기 중인 연동 요청이 아닙니다."),
     GUARDIAN_LINK_NOT_ACTIVE(HttpStatus.CONFLICT, "연동 중인 상태가 아닙니다."),
     PERMISSION_UPGRADE_FORBIDDEN(HttpStatus.FORBIDDEN, "권한 범위를 넓히는 것은 복약자 본인만 할 수 있습니다."),
+    INSUFFICIENT_PERMISSION(HttpStatus.FORBIDDEN, "이 복약자의 데이터에 대해 해당 작업을 할 권한이 없습니다."),
 
     // --- 문자 인증 ---
     LEGAL_REP_PHONE_REQUIRED(HttpStatus.BAD_REQUEST, "만 14세 미만 복약자는 법정대리인 휴대폰 번호가 필요합니다."),
