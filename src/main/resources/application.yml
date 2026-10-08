@@ -1,4 +1,6 @@
 spring:
+  config:
+    import: optional:application-local.yml
   application:
     name: yakyeon
   datasource:
@@ -13,5 +15,17 @@ spring:
       hibernate:
         format_sql: true
 
+jwt:
+  secret: ${JWT_SECRET}
+  access-token-expiration-seconds: 1800
+  refresh-token-expiration-seconds: 1209600
+
+encryption:
+  phone-key: ${PHONE_ENCRYPTION_KEY:}
+
 server:
   port: 8080
+
+logging:
+  level:
+    org.springframework.security: DEBUG
