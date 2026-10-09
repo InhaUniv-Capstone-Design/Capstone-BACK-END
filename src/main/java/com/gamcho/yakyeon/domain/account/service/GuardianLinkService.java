@@ -85,10 +85,16 @@ public class GuardianLinkService {
             throw new BusinessException(ErrorCode.GUARDIAN_LINK_ALREADY_EXISTS);
         }
 
+        // 권한 기본값은 최소 권한(READ_ONLY)이고, 복약자가 직접 올려줘야 쓰기가 열린다.
+        // 단 앱 계정이 없는 복약자는 권한을 올려줄 사람이 없어서, DB 트리거(default_proxy_link_scope)가
+        // READ_WRITE로 보정한다. 저장된 값과 메모리 값이 어긋나지 않게 같은 규칙을 여기서도 적용한다.
+        GuardianLink.PermissionScope initialScope = patient.getUser() == null
+                ? GuardianLink.PermissionScope.READ_WRITE
+                : GuardianLink.PermissionScope.READ_ONLY;
         GuardianLink link = GuardianLink.builder()
                 .guardianUser(guardian)
                 .patient(patient)
-                .permissionScope(GuardianLink.PermissionScope.READ_WRITE) // DB 기본값과 동일
+                .permissionScope(initialScope)
                 .build();
         GuardianLink saved = guardianLinkRepository.save(link);
 
@@ -126,7 +132,7 @@ public class GuardianLinkService {
             // REJECT는 "누가 동의했는가"가 아니라 대기 중인 요청을 닫는 기록이라 subject는 SELF로 둔다
             // (LEGAL_REP으로 기록하려면 이름이 필수인데, 거부 시에는 받지 않는다).
             saveLog(link, patient, userId, ConsentLog.Action.REJECT,
-                    GuardianLink.ConsentSubject.SELF, null, terms, null);
+                    GuardianLink.ConsentSubject.SELF, null, terms, null, ConsentLog.ActorType.GUARDIAN);
             return new ConsentResponse(link.getStatus().name());
         }
 
@@ -162,8 +168,10 @@ public class GuardianLinkService {
         GuardianLink.ConsentSubject subject =
                 minor ? GuardianLink.ConsentSubject.LEGAL_REP : GuardianLink.ConsentSubject.SELF;
         link.activate(subject);
+        // actor는 "요청을 제출한 사람"(보호자)이다. 복약자 본인 또는 법정대리인이 동의했다는 사실은
+        // consent_subject와 문자 인증(verification_id)이 증명한다.
         saveLog(link, patient, userId, ConsentLog.Action.GRANT, subject, legalRepName, terms,
-                verification.getVerificationId());
+                verification.getVerificationId(), ConsentLog.ActorType.GUARDIAN);
 
         return new ConsentResponse(link.getStatus().name());
     }
@@ -193,7 +201,7 @@ public class GuardianLinkService {
             throw new BusinessException(ErrorCode.GUARDIAN_LINK_NOT_ACTIVE);
         }
 
-        revokeLink(link, null);
+        revokeLink(link, null, isPatientSelf ? ConsentLog.ActorType.PATIENT : ConsentLog.ActorType.GUARDIAN);
     }
 
     /**
@@ -240,7 +248,8 @@ public class GuardianLinkService {
         link.changePermissionScope(newScope);
         // consent_log.permission_scope는 "이 시점의 권한 범위" - 변경 후 값이 기록된다
         saveLog(link, patient, link.getGuardianUser().getUserId(), ConsentLog.Action.SCOPE_CHANGE,
-                GuardianLink.ConsentSubject.SELF, null, terms, null);
+                GuardianLink.ConsentSubject.SELF, null, terms, null,
+                isPatientSelf ? ConsentLog.ActorType.PATIENT : ConsentLog.ActorType.GUARDIAN);
 
         return new PermissionChangeResponse(link.getLinkId(), newScope.name());
     }
@@ -249,19 +258,18 @@ public class GuardianLinkService {
      * 연동 하나를 철회 처리하고 consent_log(REVOKE)에 이력을 남긴다.
      * 로그인 기반 철회(verificationId=null)와 문자 인증 철회(RevocationService)가 공통으로 쓴다.
      *
-     * consent_log에는 "누가 철회했는지"를 구분하는 컬럼이 없다 (consent_subject는 동의 주체이고
-     * guardian_user_id는 연동의 보호자). 문자 인증 철회는 verification_id로 구분되지만,
-     * 보호자가 끊은 건지 복약자가 로그인해서 끊은 건지는 이력만으로는 알 수 없다.
+     * 철회한 주체(actor)는 consent_log.actor_type에 남는다: 보호자가 끊었으면 GUARDIAN, 복약자가 로그인해서
+     * 또는 문자 인증으로 끊었으면 PATIENT. (탈퇴로 인한 자동 해제는 DB 함수가 SYSTEM으로 남긴다.)
      */
     @Transactional
-    public void revokeLink(GuardianLink link, Long verificationId) {
+    public void revokeLink(GuardianLink link, Long verificationId, ConsentLog.ActorType actor) {
         Patient patient = link.getPatient();
         TermsVersion terms = latestTerms(
                 patient.isUnder14() ? TermsVersion.TermsType.LEGAL_REP : TermsVersion.TermsType.DELEGATION);
 
         link.revoke();
         saveLog(link, patient, link.getGuardianUser().getUserId(), ConsentLog.Action.REVOKE,
-                GuardianLink.ConsentSubject.SELF, null, terms, verificationId);
+                GuardianLink.ConsentSubject.SELF, null, terms, verificationId, actor);
     }
 
     private TermsVersion latestTerms(TermsVersion.TermsType type) {
@@ -272,7 +280,7 @@ public class GuardianLinkService {
 
     private void saveLog(GuardianLink link, Patient patient, Long guardianUserId, ConsentLog.Action action,
                          GuardianLink.ConsentSubject subject, String legalRepName, TermsVersion terms,
-                         Long verificationId) {
+                         Long verificationId, ConsentLog.ActorType actor) {
         consentLogRepository.save(ConsentLog.builder()
                 .patientId(patient.getPatientId())
                 .guardianUserId(guardianUserId)
@@ -283,6 +291,7 @@ public class GuardianLinkService {
                 .permissionScope(link.getPermissionScope())
                 .termsVersionId(terms.getTermsVersionId())
                 .verificationId(verificationId)
+                .actorType(actor)
                 .build());
     }
 

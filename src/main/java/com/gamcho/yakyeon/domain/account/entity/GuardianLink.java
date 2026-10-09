@@ -57,7 +57,8 @@ public class GuardianLink {
         this.guardianUser = guardianUser;
         this.patient = patient;
         this.status = LinkStatus.PENDING;
-        this.permissionScope = permissionScope != null ? permissionScope : PermissionScope.READ_WRITE;
+        // DB 기본값(READ_ONLY, 최소 권한)과 맞춘다. 값을 넘기지 않으면 읽기 전용으로 시작한다
+        this.permissionScope = permissionScope != null ? permissionScope : PermissionScope.READ_ONLY;
     }
 
     @PrePersist

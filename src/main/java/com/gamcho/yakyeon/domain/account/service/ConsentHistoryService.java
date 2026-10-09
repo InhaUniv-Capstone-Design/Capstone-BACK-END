@@ -89,6 +89,7 @@ public class ConsentHistoryService {
                 l.getConsentLogId(),
                 l.getLinkId(),
                 l.getAction().name(),
+                l.getActorType().name(),
                 l.getConsentSubject().name(),
                 l.getPermissionScope().name(),
                 l.getLegalRepName(),
