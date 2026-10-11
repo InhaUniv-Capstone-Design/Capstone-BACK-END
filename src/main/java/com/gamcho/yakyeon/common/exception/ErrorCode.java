@@ -48,6 +48,11 @@ public enum ErrorCode {
     DRUG_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 약물입니다."),
     /** 없는 약이거나, 남의 약이거나, 이미 삭제된 약. 셋을 구분해서 알려주면 "이 번호의 약이 존재한다"는 정보가 새므로 같은 응답을 쓴다 */
     MEDICATION_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 약물 정보입니다."),
+
+    // --- 처방전 이미지 ---
+    INVALID_IMAGE(HttpStatus.BAD_REQUEST, "올바른 이미지 파일이 아닙니다. JPEG 또는 PNG 이미지를 올려주세요."),
+    /** 413. 스프링 버전에 따라 상수 이름이 다르므로(PAYLOAD_TOO_LARGE / CONTENT_TOO_LARGE) 숫자로 만든다 */
+    IMAGE_TOO_LARGE(HttpStatus.valueOf(413), "이미지가 너무 큽니다. 10MB 이하로 올려주세요."),
     /** 약 항목의 값이 규칙에 맞지 않음. 어느 약의 어떤 필드인지는 상황별 메시지로 알려준다 */
     INVALID_MEDICATION(HttpStatus.BAD_REQUEST, "약물 정보가 올바르지 않습니다."),
 

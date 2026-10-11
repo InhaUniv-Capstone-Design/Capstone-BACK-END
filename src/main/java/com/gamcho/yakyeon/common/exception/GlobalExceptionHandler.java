@@ -5,7 +5,11 @@ import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.MultipartException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 
 /**
  * 전 컨트롤러 공통 예외 처리.
@@ -51,5 +55,36 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleTypeMismatch(MethodArgumentTypeMismatchException e) {
         return ResponseEntity.badRequest().body(new ErrorResponse(
                 "VALIDATION_ERROR", "요청 파라미터 '" + e.getName() + "'의 형식이 올바르지 않습니다."));
+    }
+
+    /**
+     * 업로드 크기 초과 (spring.servlet.multipart.max-file-size). 컨트롤러에 닿기 전에 던져진다.
+     * MultipartException의 하위 타입이라 아래 일반 핸들러보다 이쪽이 먼저 선택된다.
+     */
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ErrorResponse> handleUploadTooLarge(MaxUploadSizeExceededException e) {
+        return ResponseEntity.status(ErrorCode.IMAGE_TOO_LARGE.getStatus())
+                .body(ErrorResponse.of(ErrorCode.IMAGE_TOO_LARGE));
+    }
+
+    /** multipart 요청이 아니거나 형식이 깨진 경우 */
+    @ExceptionHandler(MultipartException.class)
+    public ResponseEntity<ErrorResponse> handleMultipart(MultipartException e) {
+        return ResponseEntity.badRequest().body(new ErrorResponse(
+                "VALIDATION_ERROR", "파일은 multipart/form-data 형식으로 보내주세요."));
+    }
+
+    /** 필수 파일 항목(예: image)이 없음 */
+    @ExceptionHandler(MissingServletRequestPartException.class)
+    public ResponseEntity<ErrorResponse> handleMissingPart(MissingServletRequestPartException e) {
+        return ResponseEntity.badRequest().body(new ErrorResponse(
+                "VALIDATION_ERROR", "필수 항목 '" + e.getRequestPartName() + "'이(가) 없습니다."));
+    }
+
+    /** 필수 쿼리 파라미터(예: patient_id)가 없음 */
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<ErrorResponse> handleMissingParameter(MissingServletRequestParameterException e) {
+        return ResponseEntity.badRequest().body(new ErrorResponse(
+                "VALIDATION_ERROR", "필수 파라미터 '" + e.getParameterName() + "'이(가) 없습니다."));
     }
 }
