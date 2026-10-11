@@ -5,6 +5,7 @@ import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 /**
  * 전 컨트롤러 공통 예외 처리.
@@ -40,5 +41,15 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleNotReadable(HttpMessageNotReadableException e) {
         return ResponseEntity.badRequest().body(new ErrorResponse(
                 "VALIDATION_ERROR", "요청 형식이 올바르지 않습니다. 값의 형식과 허용되는 값을 확인해주세요."));
+    }
+
+    /**
+     * 쿼리 파라미터·경로 변수의 형식 오류 (예: ?date=abc, ?status=FOO, /medications/abc).
+     * 안 잡으면 스프링 기본 오류 응답이 나가 공통 포맷이 깨진다. 입력값은 응답에 되돌려주지 않는다.
+     */
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ErrorResponse> handleTypeMismatch(MethodArgumentTypeMismatchException e) {
+        return ResponseEntity.badRequest().body(new ErrorResponse(
+                "VALIDATION_ERROR", "요청 파라미터 '" + e.getName() + "'의 형식이 올바르지 않습니다."));
     }
 }
