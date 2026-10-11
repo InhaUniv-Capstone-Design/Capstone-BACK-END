@@ -24,6 +24,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -136,7 +137,7 @@ public class PatientMedication {
         this.patient = patient;
         this.prescription = prescription;
         this.inputName = inputName;
-        this.dosePerIntake = dosePerIntake != null ? dosePerIntake : BigDecimal.ONE;
+        this.dosePerIntake = normalizeDose(dosePerIntake);
         this.prn = prn;
         this.timesPerDay = timesPerDay;
         this.mealRelation = mealRelation;
@@ -176,7 +177,7 @@ public class PatientMedication {
         }
         validateSchedule(prn, timesPerDay, timingSlots, mealRelation, mealOffsetMin);
         this.inputName = inputName;
-        this.dosePerIntake = dosePerIntake != null ? dosePerIntake : BigDecimal.ONE;
+        this.dosePerIntake = normalizeDose(dosePerIntake);
         this.timesPerDay = timesPerDay;
         this.mealRelation = mealRelation;
         this.mealOffsetMin = mealOffsetMin;
@@ -184,6 +185,15 @@ public class PatientMedication {
         this.startDate = startDate;
         changeDrug(drug);
         replaceTimings(timingSlots);
+    }
+
+    /**
+     * 1회 복용량을 DB 컬럼(NUMERIC(5,2))과 같은 소수점 두 자리로 맞춘다. 생략하면 1.
+     * 안 맞추면 저장은 되지만, 저장 직후 응답에는 받은 값 그대로(예: 2)가, 다시 조회하면 DB 형식(2.00)이 나와서
+     * 같은 약이 응답마다 다르게 보인다. 요청 검증이 소수점 둘째 자리까지만 허용하므로 반올림으로 값이 바뀌지는 않는다.
+     */
+    private static BigDecimal normalizeDose(BigDecimal dose) {
+        return (dose != null ? dose : BigDecimal.ONE).setScale(2, RoundingMode.HALF_UP);
     }
 
     /** DB 제약을 저장 전에 미리 검사한다. 실제 입력 검증은 DTO(400)에서 먼저 걸러야 하고, 여기는 마지막 방어선 */
@@ -238,6 +248,20 @@ public class PatientMedication {
             return endDate;
         }
         return startDate.plusDays(totalDays - 1L);
+    }
+
+    /**
+     * 기준일 기준의 복용 상태. 시작일 전이면 UPCOMING, 종료일 뒤면 ENDED, 그 사이(양 끝 포함)면 ACTIVE.
+     * 삭제된 약(deleted_at)은 이 계산 대상이 아니다 - 조회에서 먼저 제외해야 한다.
+     */
+    public MedicationStatus statusOn(LocalDate date) {
+        if (date.isBefore(startDate)) {
+            return MedicationStatus.UPCOMING;
+        }
+        if (date.isAfter(getEndDate())) {
+            return MedicationStatus.ENDED;
+        }
+        return MedicationStatus.ACTIVE;
     }
 
     public enum MealRelation {
