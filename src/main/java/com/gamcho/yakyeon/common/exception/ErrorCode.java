@@ -44,6 +44,11 @@ public enum ErrorCode {
     // --- 약물 검색 ---
     INVALID_SEARCH_QUERY(HttpStatus.BAD_REQUEST, "검색어가 너무 깁니다. 50자 이하로 입력해주세요."),
 
+    // --- 처방·약물 등록 ---
+    DRUG_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 약물입니다."),
+    /** 약 항목의 값이 규칙에 맞지 않음. 어느 약의 어떤 필드인지는 상황별 메시지로 알려준다 */
+    INVALID_MEDICATION(HttpStatus.BAD_REQUEST, "약물 정보가 올바르지 않습니다."),
+
     // --- 문자 인증 ---
     LEGAL_REP_PHONE_REQUIRED(HttpStatus.BAD_REQUEST, "만 14세 미만 복약자는 법정대리인 휴대폰 번호가 필요합니다."),
     LEGAL_REP_NAME_REQUIRED(HttpStatus.BAD_REQUEST, "만 14세 미만 복약자는 동의 시 법정대리인 이름이 필요합니다."),
