@@ -27,6 +27,16 @@ public class MedicationService {
 
     private static final String RESOURCE_TYPE = "patient_medication";
 
+    /**
+     * 약 목록의 정렬 기준: 복용 중 → 복용 예정 → 복용 종료. 복용 종료 안에서는 최근에 끝난 약이 먼저, 나머지는 등록순.
+     * 병원별 조회처럼 약을 다른 모양으로 묶어서 보여줄 때도 같은 순서를 쓰도록 상수로 둔다.
+     */
+    public static final Comparator<MedicationResponse> LIST_ORDER =
+            Comparator.<MedicationResponse>comparingInt(r -> order(r.status()))
+                    .thenComparing((a, b) -> a.status() == MedicationStatus.ENDED
+                            ? b.endDate().compareTo(a.endDate()) : 0)
+                    .thenComparing(MedicationResponse::medicationId);
+
     private final PatientAccessGuard patientAccessGuard;
     private final PatientMedicationRepository patientMedicationRepository;
     private final MedicationInputValidator medicationInputValidator;
@@ -45,10 +55,7 @@ public class MedicationService {
         return patientMedicationRepository.findAliveByPatientId(patientId).stream()
                 .map(m -> MedicationResponse.from(m, reference))
                 .filter(r -> statusFilter == null || r.status() == statusFilter)
-                .sorted(Comparator.<MedicationResponse>comparingInt(r -> order(r.status()))
-                        .thenComparing((a, b) -> a.status() == MedicationStatus.ENDED
-                                ? b.endDate().compareTo(a.endDate()) : 0)
-                        .thenComparing(MedicationResponse::medicationId))
+                .sorted(LIST_ORDER)
                 .toList();
     }
 
