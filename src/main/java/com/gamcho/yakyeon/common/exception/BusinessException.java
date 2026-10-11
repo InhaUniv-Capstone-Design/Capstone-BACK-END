@@ -15,4 +15,14 @@ public class BusinessException extends RuntimeException {
         super(errorCode.getDefaultMessage());
         this.errorCode = errorCode;
     }
+
+    /**
+     * 상황별 메시지를 직접 지정한다. 여러 항목을 한 번에 받는 요청에서
+     * "2번째 약의 어떤 값이 문제인지"처럼 구체적으로 알려줄 때 사용한다.
+     * 응답의 code와 HTTP 상태는 ErrorCode 그대로이고 message만 바뀐다.
+     */
+    public BusinessException(ErrorCode errorCode, String message) {
+        super(message);
+        this.errorCode = errorCode;
+    }
 }

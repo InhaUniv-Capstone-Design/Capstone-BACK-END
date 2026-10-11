@@ -4,6 +4,7 @@ import com.gamcho.yakyeon.client.sms.SmsGateway;
 import com.gamcho.yakyeon.common.exception.BusinessException;
 import com.gamcho.yakyeon.common.exception.ErrorCode;
 import com.gamcho.yakyeon.common.util.PhoneNumbers;
+import com.gamcho.yakyeon.domain.account.entity.ConsentLog;
 import com.gamcho.yakyeon.domain.account.entity.GuardianLink;
 import com.gamcho.yakyeon.domain.account.entity.Patient;
 import com.gamcho.yakyeon.domain.account.entity.PhoneVerification;
@@ -137,7 +138,8 @@ public class RevocationService {
                     && link.getStatus() == GuardianLink.LinkStatus.ACTIVE
                     && link.getPatient().isActive()
                     && hash.equals(link.getPatient().getPhoneHash())) {
-                guardianLinkService.revokeLink(link, verification.getVerificationId());
+                // 문자 인증 철회는 번호의 주인(복약자)이 직접 한 행동이므로 PATIENT. 근거 인증은 verification_id에 남는다
+                guardianLinkService.revokeLink(link, verification.getVerificationId(), ConsentLog.ActorType.PATIENT);
                 revoked++;
             }
         }

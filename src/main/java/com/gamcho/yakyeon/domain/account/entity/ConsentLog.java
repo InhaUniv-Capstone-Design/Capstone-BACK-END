@@ -59,6 +59,16 @@ public class ConsentLog {
     @Column(name = "verification_id")
     private Long verificationId;
 
+    /**
+     * 이 행동을 "누가" 했는지 (DB 필수 컬럼). consent_subject(누가 동의했는가)와는 다르다.
+     *  - GUARDIAN: 보호자가 한 일 (동의·거부 요청 제출, 연동 해제, 권한 낮추기)
+     *  - PATIENT : 복약자 본인이 한 일 (로그인해서 철회·권한 변경, 문자 인증으로 철회)
+     *  - SYSTEM  : 탈퇴 등 DB 함수가 자동으로 남긴 이력 (이 값은 DB 함수가 직접 채우므로 앱 코드에서는 쓰지 않음)
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "actor_type", nullable = false, length = 10)
+    private ActorType actorType;
+
     @Column(name = "occurred_at", nullable = false, updatable = false)
     private LocalDateTime occurredAt;
 
@@ -66,7 +76,10 @@ public class ConsentLog {
     public ConsentLog(Long patientId, Long guardianUserId, Long linkId, Action action,
                       GuardianLink.ConsentSubject consentSubject, String legalRepName,
                       GuardianLink.PermissionScope permissionScope, Long termsVersionId,
-                      Long verificationId) {
+                      Long verificationId, ActorType actorType) {
+        if (actorType == null) {
+            throw new IllegalArgumentException("actorType은 필수입니다.");
+        }
         if (consentSubject == GuardianLink.ConsentSubject.LEGAL_REP
                 && (legalRepName == null || legalRepName.isBlank())) {
             throw new IllegalArgumentException("법정대리인 동의(LEGAL_REP)는 legalRepName이 필수입니다.");
@@ -80,6 +93,7 @@ public class ConsentLog {
         this.permissionScope = permissionScope;
         this.termsVersionId = termsVersionId;
         this.verificationId = verificationId;
+        this.actorType = actorType;
     }
 
     @PrePersist
@@ -89,5 +103,9 @@ public class ConsentLog {
 
     public enum Action {
         GRANT, REJECT, REVOKE, SCOPE_CHANGE
+    }
+
+    public enum ActorType {
+        GUARDIAN, PATIENT, SYSTEM
     }
 }

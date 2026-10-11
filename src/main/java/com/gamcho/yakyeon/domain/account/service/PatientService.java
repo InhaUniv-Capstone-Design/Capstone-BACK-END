@@ -83,6 +83,7 @@ public class PatientService {
         GuardianLink link = GuardianLink.builder()
                 .guardianUser(guardian)
                 .patient(saved)
+                // 앱 계정이 없는 복약자는 권한을 올려줄 사람이 없어 READ_WRITE (DB 트리거 default_proxy_link_scope와 같은 규칙)
                 .permissionScope(GuardianLink.PermissionScope.READ_WRITE)
                 .build();
         link.activate(GuardianLink.ConsentSubject.SELF);

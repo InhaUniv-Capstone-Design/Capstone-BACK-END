@@ -41,6 +41,21 @@ public enum ErrorCode {
     PERMISSION_UPGRADE_FORBIDDEN(HttpStatus.FORBIDDEN, "권한 범위를 넓히는 것은 복약자 본인만 할 수 있습니다."),
     INSUFFICIENT_PERMISSION(HttpStatus.FORBIDDEN, "이 복약자의 데이터에 대해 해당 작업을 할 권한이 없습니다."),
 
+    // --- 약물 검색 ---
+    INVALID_SEARCH_QUERY(HttpStatus.BAD_REQUEST, "검색어가 너무 깁니다. 50자 이하로 입력해주세요."),
+
+    // --- 처방·약물 등록 ---
+    DRUG_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 약물입니다."),
+    /** 없는 약이거나, 남의 약이거나, 이미 삭제된 약. 셋을 구분해서 알려주면 "이 번호의 약이 존재한다"는 정보가 새므로 같은 응답을 쓴다 */
+    MEDICATION_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 약물 정보입니다."),
+
+    // --- 처방전 이미지 ---
+    INVALID_IMAGE(HttpStatus.BAD_REQUEST, "올바른 이미지 파일이 아닙니다. JPEG 또는 PNG 이미지를 올려주세요."),
+    /** 413. 스프링 버전에 따라 상수 이름이 다르므로(PAYLOAD_TOO_LARGE / CONTENT_TOO_LARGE) 숫자로 만든다 */
+    IMAGE_TOO_LARGE(HttpStatus.valueOf(413), "이미지가 너무 큽니다. 10MB 이하로 올려주세요."),
+    /** 약 항목의 값이 규칙에 맞지 않음. 어느 약의 어떤 필드인지는 상황별 메시지로 알려준다 */
+    INVALID_MEDICATION(HttpStatus.BAD_REQUEST, "약물 정보가 올바르지 않습니다."),
+
     // --- 문자 인증 ---
     LEGAL_REP_PHONE_REQUIRED(HttpStatus.BAD_REQUEST, "만 14세 미만 복약자는 법정대리인 휴대폰 번호가 필요합니다."),
     LEGAL_REP_NAME_REQUIRED(HttpStatus.BAD_REQUEST, "만 14세 미만 복약자는 동의 시 법정대리인 이름이 필요합니다."),
