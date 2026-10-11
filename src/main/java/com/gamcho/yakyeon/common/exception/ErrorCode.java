@@ -41,6 +41,9 @@ public enum ErrorCode {
     PERMISSION_UPGRADE_FORBIDDEN(HttpStatus.FORBIDDEN, "권한 범위를 넓히는 것은 복약자 본인만 할 수 있습니다."),
     INSUFFICIENT_PERMISSION(HttpStatus.FORBIDDEN, "이 복약자의 데이터에 대해 해당 작업을 할 권한이 없습니다."),
 
+    // --- 약물 검색 ---
+    INVALID_SEARCH_QUERY(HttpStatus.BAD_REQUEST, "검색어가 너무 깁니다. 50자 이하로 입력해주세요."),
+
     // --- 문자 인증 ---
     LEGAL_REP_PHONE_REQUIRED(HttpStatus.BAD_REQUEST, "만 14세 미만 복약자는 법정대리인 휴대폰 번호가 필요합니다."),
     LEGAL_REP_NAME_REQUIRED(HttpStatus.BAD_REQUEST, "만 14세 미만 복약자는 동의 시 법정대리인 이름이 필요합니다."),
