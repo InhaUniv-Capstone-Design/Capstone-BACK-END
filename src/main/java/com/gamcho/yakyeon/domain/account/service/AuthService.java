@@ -2,6 +2,7 @@ package com.gamcho.yakyeon.domain.account.service;
 
 import com.gamcho.yakyeon.common.exception.BusinessException;
 import com.gamcho.yakyeon.common.exception.ErrorCode;
+import com.gamcho.yakyeon.common.util.PhoneNumbers;
 import com.gamcho.yakyeon.domain.account.dto.AccountDeleteRequest;
 import com.gamcho.yakyeon.domain.account.dto.AgreementItem;
 import com.gamcho.yakyeon.domain.account.dto.LoginRequest;
@@ -11,17 +12,22 @@ import com.gamcho.yakyeon.domain.account.dto.RefreshRequest;
 import com.gamcho.yakyeon.domain.account.dto.SignupRequest;
 import com.gamcho.yakyeon.domain.account.entity.AppUser;
 import com.gamcho.yakyeon.domain.account.entity.AuthToken;
+import com.gamcho.yakyeon.domain.account.entity.Patient;
 import com.gamcho.yakyeon.domain.account.entity.TermsVersion;
 import com.gamcho.yakyeon.domain.account.entity.UserAgreement;
 import com.gamcho.yakyeon.domain.account.repository.AppUserRepository;
 import com.gamcho.yakyeon.domain.account.repository.AuthTokenRepository;
+import com.gamcho.yakyeon.domain.account.repository.PatientRepository;
 import com.gamcho.yakyeon.domain.account.repository.TermsVersionRepository;
 import com.gamcho.yakyeon.domain.account.repository.UserAgreementRepository;
+import com.gamcho.yakyeon.security.PhoneEncryptor;
+import com.gamcho.yakyeon.security.PhoneHasher;
 import com.gamcho.yakyeon.security.RefreshTokenGenerator;
 import com.gamcho.yakyeon.security.TokenHasher;
 import com.gamcho.yakyeon.security.jwt.JwtTokenProvider;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.PreparedStatementCallback;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -55,6 +61,10 @@ public class AuthService {
     private final RefreshTokenGenerator refreshTokenGenerator;
     private final TokenHasher tokenHasher;
     private final JdbcTemplate jdbcTemplate;
+    private final PatientRepository patientRepository;
+    private final PhoneEncryptor phoneEncryptor;
+    private final PhoneHasher phoneHasher;
+    private final SignupVerificationService signupVerificationService;
 
     @Value("${jwt.refresh-token-expiration-seconds:1209600}")
     private long refreshTokenExpirationSeconds;
@@ -70,14 +80,51 @@ public class AuthService {
             throw new BusinessException(ErrorCode.DUPLICATE_LOGIN_ID);
         }
 
+        // 휴대폰 번호: 해시(중복 검사·조회용)와 암호문(보관용)을 만든다. 평문은 어디에도 저장하지 않는다.
+        String phone = PhoneNumbers.normalize(request.getPhone());
+        if (!PhoneNumbers.isValidMobile(phone)) {
+            throw new BusinessException(ErrorCode.INVALID_PHONE_FORMAT);
+        }
+        String phoneHash = phoneHasher.hash(phone);
+        if (appUserRepository.existsByPhoneHashAndAccountTypeAndDeletedAtIsNull(phoneHash, request.getAccountType())) {
+            throw new BusinessException(ErrorCode.DUPLICATE_PHONE);
+        }
+
         List<AgreementPlan> agreementPlan = resolveAgreementPlan(request.getAgreements());
 
+        // 문자 인증 증표 확인·소진. 아래 단계에서 가입이 실패해 롤백되면 소진도 취소돼 인증이 되살아난다.
+        signupVerificationService.consume(request.getVerificationId(), request.getVerificationToken(), phoneHash);
+
+        byte[] phoneEnc = phoneEncryptor.encrypt(phone);
         AppUser user = AppUser.builder()
                 .loginId(request.getLoginId())
                 .passwordHash(passwordEncoder.encode(request.getPassword()))
                 .accountType(request.getAccountType())
+                .name(request.getName())
+                .birthDate(request.getBirthDate())
+                .phoneEnc(phoneEnc)
+                .phoneHash(phoneHash)
                 .build();
-        AppUser savedUser = appUserRepository.save(user);
+        AppUser savedUser;
+        try {
+            // 바로 flush해서, 동시에 같은 아이디·번호로 가입한 경우의 DB 유니크 위반을 여기서 잡는다
+            savedUser = appUserRepository.saveAndFlush(user);
+        } catch (DataIntegrityViolationException e) {
+            throw translateSignupConflict(e);
+        }
+
+        // 본인(PATIENT) 가입이면 복약자 프로필을 같은 정보로 함께 만든다 (이후 POST /patients 없이 바로 약 등록 가능).
+        // 보호자(GUARDIAN) 가입은 복약자가 없다 - 복약자는 나중에 등록하거나 연동한다.
+        if (request.getAccountType() == AppUser.AccountType.PATIENT) {
+            patientRepository.save(Patient.builder()
+                    .user(savedUser)
+                    .name(request.getName())
+                    .birthDate(request.getBirthDate())
+                    .phoneEnc(phoneEnc)
+                    .phoneHash(phoneHash)
+                    .createdBy(savedUser)
+                    .build());
+        }
 
         List<UserAgreement> agreements = agreementPlan.stream()
                 .map(plan -> UserAgreement.builder()
@@ -89,6 +136,18 @@ public class AuthService {
         userAgreementRepository.saveAll(agreements);
 
         return savedUser.getUserId();
+    }
+
+    /** DB 유니크 제약 위반을 사용자에게 의미 있는 오류로 바꾼다. 그 밖의 무결성 오류는 그대로 올려보낸다. */
+    private BusinessException translateSignupConflict(DataIntegrityViolationException e) {
+        String detail = String.valueOf(e.getMostSpecificCause().getMessage());
+        if (detail.contains("uq_app_user_phone_active")) {
+            return new BusinessException(ErrorCode.DUPLICATE_PHONE);
+        }
+        if (detail.contains("login_id")) {
+            return new BusinessException(ErrorCode.DUPLICATE_LOGIN_ID);
+        }
+        throw e;
     }
 
     /** FR-AUTH-002: 아이디 중복 검사 (활성 계정 기준) */
