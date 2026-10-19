@@ -6,9 +6,14 @@ import com.gamcho.yakyeon.domain.account.dto.LoginRequest;
 import com.gamcho.yakyeon.domain.account.dto.LoginResponse;
 import com.gamcho.yakyeon.domain.account.dto.PasswordChangeRequest;
 import com.gamcho.yakyeon.domain.account.dto.RefreshRequest;
+import com.gamcho.yakyeon.domain.account.dto.SignupPhoneConfirmResponse;
+import com.gamcho.yakyeon.domain.account.dto.SignupPhoneSendRequest;
 import com.gamcho.yakyeon.domain.account.dto.SignupRequest;
 import com.gamcho.yakyeon.domain.account.dto.SignupResponse;
+import com.gamcho.yakyeon.domain.account.dto.VerificationConfirmRequest;
+import com.gamcho.yakyeon.domain.account.dto.VerificationSendResponse;
 import com.gamcho.yakyeon.domain.account.service.AuthService;
+import com.gamcho.yakyeon.domain.account.service.SignupVerificationService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -29,11 +34,27 @@ import org.springframework.web.bind.annotation.*;
 public class AuthController {
 
     private final AuthService authService;
+    private final SignupVerificationService signupVerificationService;
 
     @PostMapping("/signup")
     public ResponseEntity<SignupResponse> signup(@Valid @RequestBody SignupRequest request) {
         Long userId = authService.signup(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(new SignupResponse(userId));
+    }
+
+    /** 회원가입 화면의 "인증번호 받기" - 계정이 없으므로 로그인 없이 호출 */
+    @PostMapping("/phone-verifications")
+    public ResponseEntity<VerificationSendResponse> sendSignupCode(
+            @Valid @RequestBody SignupPhoneSendRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(signupVerificationService.send(request.getPhone()));
+    }
+
+    /** 인증번호 입력 확인. 성공하면 가입 요청에 같이 보낼 verification_token을 돌려준다 */
+    @PostMapping("/phone-verifications/{verificationId}/confirm")
+    public ResponseEntity<SignupPhoneConfirmResponse> confirmSignupCode(
+            @PathVariable("verificationId") Long verificationId,
+            @Valid @RequestBody VerificationConfirmRequest request) {
+        return ResponseEntity.ok(signupVerificationService.confirm(verificationId, request.getCode()));
     }
 
     @GetMapping("/check-id")
