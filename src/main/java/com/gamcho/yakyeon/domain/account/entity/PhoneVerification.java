@@ -56,11 +56,11 @@ public class PhoneVerification {
     private LocalDateTime verifiedAt;
 
     /**
-     * 이 인증이 속한 보호자 연동 요청(guardian_link.link_id). 팀 스키마에서 NOT NULL + FK(CASCADE)다.
-     * 인증을 특정 연동 요청에 묶어서, 다른 보호자가 남의 verification_id로
-     * 자기 동의를 승인받는 걸 막는다.
+     * 이 인증이 속한 보호자 연동 요청(guardian_link.link_id). 인증을 특정 연동 요청에 묶어서,
+     * 다른 보호자가 남의 verification_id로 자기 동의를 승인받는 걸 막는다.
+     * 팀 스키마(26-10-19)에서 SIGNUP(회원가입용)만 null이고 나머지 목적은 반드시 값이 있다 (DB CHECK).
      */
-    @Column(name = "link_id", nullable = false)
+    @Column(name = "link_id")
     private Long linkId;
 
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -104,6 +104,6 @@ public class PhoneVerification {
     }
 
     public enum Purpose {
-        DELEGATION, LEGAL_REP, REVOKE
+        DELEGATION, LEGAL_REP, REVOKE, SIGNUP
     }
 }
