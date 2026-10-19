@@ -11,6 +11,7 @@ import com.gamcho.yakyeon.domain.account.entity.PhoneVerification;
 import com.gamcho.yakyeon.domain.account.repository.GuardianLinkRepository;
 import com.gamcho.yakyeon.domain.account.repository.PatientRepository;
 import com.gamcho.yakyeon.domain.account.repository.PhoneVerificationRepository;
+import com.gamcho.yakyeon.security.PhoneHasher;
 import com.gamcho.yakyeon.security.TokenHasher;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -51,6 +52,7 @@ public class RevocationService {
     private final PhoneVerificationRepository phoneVerificationRepository;
     private final GuardianLinkService guardianLinkService;
     private final TokenHasher tokenHasher;
+    private final PhoneHasher phoneHasher;
     private final SmsGateway smsGateway;
 
     private final SecureRandom secureRandom = new SecureRandom();
@@ -65,7 +67,7 @@ public class RevocationService {
         if (!PhoneNumbers.isValidMobile(phone)) {
             throw new BusinessException(ErrorCode.INVALID_PHONE_FORMAT);
         }
-        String hash = tokenHasher.sha256Hex(phone);
+        String hash = phoneHasher.hash(phone);
 
         List<GuardianLink> links = findActiveLinks(hash);
         if (!links.isEmpty()) {
@@ -105,7 +107,7 @@ public class RevocationService {
         if (!PhoneNumbers.isValidMobile(phone)) {
             throw new BusinessException(ErrorCode.INVALID_PHONE_FORMAT);
         }
-        String hash = tokenHasher.sha256Hex(phone);
+        String hash = phoneHasher.hash(phone);
 
         // 락을 걸고 조회 - 동시 요청으로 시도 횟수 제한을 넘기는 걸 막는다
         List<PhoneVerification> attemptable = phoneVerificationRepository

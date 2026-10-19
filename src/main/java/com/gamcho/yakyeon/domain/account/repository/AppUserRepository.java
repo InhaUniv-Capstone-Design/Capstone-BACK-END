@@ -26,4 +26,11 @@ public interface AppUserRepository extends JpaRepository<AppUser, Long> {
      * 계정이 남은 Access Token으로 또 접근하는 걸 막기 위해 deletedAt 조건을 같이 건다.
      */
     Optional<AppUser> findByUserIdAndDeletedAtIsNull(Long userId);
+
+    /**
+     * 같은 번호로 같은 유형(PATIENT/GUARDIAN)의 활성 계정이 이미 있는지.
+     * DB의 uq_app_user_phone_active(phone_hash, account_type)와 같은 기준이다.
+     * 본인용과 보호자용 계정은 같은 번호로 하나씩 만들 수 있다.
+     */
+    boolean existsByPhoneHashAndAccountTypeAndDeletedAtIsNull(String phoneHash, AppUser.AccountType accountType);
 }

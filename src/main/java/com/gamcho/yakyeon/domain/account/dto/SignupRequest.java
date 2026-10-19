@@ -6,10 +6,12 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Past;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.Getter;
 
+import java.time.LocalDate;
 import java.util.List;
 
 /**
@@ -51,4 +53,34 @@ public class SignupRequest {
     @NotEmpty(message = "약관 동의 내역을 입력해주세요.")
     @Valid
     private List<AgreementItem> agreements;
+
+    // ---- 계정 프로필 (회원가입 화면의 이름·생년월일·휴대폰). 이메일은 받지 않는다 ----
+
+    /** 본인(PATIENT) 가입이면 복약자 이름으로도 쓰인다 */
+    @JsonProperty("name")
+    @NotBlank(message = "이름을 입력해주세요.")
+    @Size(max = 50, message = "이름은 50자 이하여야 합니다.")
+    private String name;
+
+    @JsonProperty("birth_date")
+    @NotNull(message = "생년월일을 입력해주세요.")
+    @Past(message = "생년월일이 올바르지 않습니다.")
+    private LocalDate birthDate;
+
+    /** 하이픈 없이 숫자만 (예: 01012345678). 서버에서 암호화해 저장하고 평문은 남기지 않는다 */
+    @JsonProperty("phone")
+    @NotBlank(message = "휴대폰 번호를 입력해주세요.")
+    @Pattern(regexp = "^01[016789][0-9]{7,8}$", message = "휴대폰 번호 형식이 올바르지 않습니다. (예: 01012345678)")
+    private String phone;
+
+    /** POST /auth/phone-verifications 응답의 verification_id */
+    @JsonProperty("verification_id")
+    @NotNull(message = "휴대폰 인증을 완료해주세요.")
+    private Long verificationId;
+
+    /** POST /auth/phone-verifications/{id}/confirm 성공 응답의 verification_token */
+    @JsonProperty("verification_token")
+    @NotBlank(message = "휴대폰 인증을 완료해주세요.")
+    @Size(max = 300, message = "인증 정보가 올바르지 않습니다.")
+    private String verificationToken;
 }

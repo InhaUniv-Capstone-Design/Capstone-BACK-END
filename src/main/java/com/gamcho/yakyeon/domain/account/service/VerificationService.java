@@ -12,6 +12,7 @@ import com.gamcho.yakyeon.domain.account.entity.PhoneVerification;
 import com.gamcho.yakyeon.domain.account.repository.GuardianLinkRepository;
 import com.gamcho.yakyeon.domain.account.repository.PhoneVerificationRepository;
 import com.gamcho.yakyeon.security.PhoneEncryptor;
+import com.gamcho.yakyeon.security.PhoneHasher;
 import com.gamcho.yakyeon.security.TokenHasher;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -33,6 +34,7 @@ public class VerificationService {
     private final GuardianLinkRepository guardianLinkRepository;
     private final PhoneVerificationRepository phoneVerificationRepository;
     private final PhoneEncryptor phoneEncryptor;
+    private final PhoneHasher phoneHasher;
     private final TokenHasher tokenHasher;
     private final SmsGateway smsGateway;
 
@@ -67,7 +69,7 @@ public class VerificationService {
                 throw new BusinessException(ErrorCode.INVALID_PHONE_FORMAT);
             }
             // 미성년 본인 휴대폰으로 인증받아서 "법정대리인 동의"로 처리되는 걸 막는다
-            if (tokenHasher.sha256Hex(legalRepPhone).equals(patient.getPhoneHash())) {
+            if (phoneHasher.hash(legalRepPhone).equals(patient.getPhoneHash())) {
                 throw new BusinessException(ErrorCode.LEGAL_REP_PHONE_SAME_AS_PATIENT);
             }
             purpose = PhoneVerification.Purpose.LEGAL_REP;
@@ -77,7 +79,7 @@ public class VerificationService {
             targetPhone = phoneEncryptor.decrypt(patient.getPhoneEnc());
         }
 
-        String targetHash = tokenHasher.sha256Hex(targetPhone);
+        String targetHash = phoneHasher.hash(targetPhone);
         LocalDateTime now = LocalDateTime.now();
 
         // 같은 번호로 문자가 쏟아지는 걸 막는다 (스팸 / 발송 비용).

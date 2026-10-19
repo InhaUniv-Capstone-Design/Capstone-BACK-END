@@ -11,7 +11,7 @@ import com.gamcho.yakyeon.domain.account.repository.AppUserRepository;
 import com.gamcho.yakyeon.domain.account.repository.GuardianLinkRepository;
 import com.gamcho.yakyeon.domain.account.repository.PatientRepository;
 import com.gamcho.yakyeon.security.PhoneEncryptor;
-import com.gamcho.yakyeon.security.TokenHasher;
+import com.gamcho.yakyeon.security.PhoneHasher;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,7 +24,7 @@ public class PatientService {
     private final PatientRepository patientRepository;
     private final GuardianLinkRepository guardianLinkRepository;
     private final PhoneEncryptor phoneEncryptor;
-    private final TokenHasher tokenHasher; // SHA-256 해시 - Refresh Token과 동일 유틸 재사용
+    private final PhoneHasher phoneHasher; // HMAC-SHA256(서버 키) - 번호 조회·중복 검사용 해시
 
     /**
      * 복약자 등록.
@@ -40,7 +40,7 @@ public class PatientService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         String normalizedPhone = normalizePhone(request.getPhone());
-        String phoneHash = tokenHasher.sha256Hex(normalizedPhone);
+        String phoneHash = phoneHasher.hash(normalizedPhone);
         byte[] phoneEnc = phoneEncryptor.encrypt(normalizedPhone);
 
         if (user.getAccountType() == AppUser.AccountType.PATIENT) {

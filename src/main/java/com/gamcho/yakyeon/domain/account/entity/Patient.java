@@ -45,7 +45,7 @@ public class Patient {
     private byte[] phoneEnc;
 
     /**
-     * SHA-256(정규화된 번호) - 조회 전용, 역산 불가.
+     * HMAC-SHA256(정규화된 번호, 서버 키) - 조회 전용. 키 없이는 번호를 되살릴 수 없다.
      * DB 컬럼이 CHAR(64)(고정 길이, PostgreSQL 내부명 bpchar)라서
      * columnDefinition 문자열만으론 부족하고, Hibernate가 스키마 검증 시 비교하는
      * JDBC 타입 코드 자체를 @JdbcTypeCode(SqlTypes.CHAR)로 명시해야 한다.

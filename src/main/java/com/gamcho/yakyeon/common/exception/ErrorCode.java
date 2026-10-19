@@ -66,7 +66,11 @@ public enum ErrorCode {
     VERIFICATION_RATE_LIMITED(HttpStatus.TOO_MANY_REQUESTS, "인증번호 요청이 너무 많습니다. 잠시 후 다시 시도해주세요."),
     VERIFICATION_REQUIRED(HttpStatus.BAD_REQUEST, "동의하려면 문자 인증이 필요합니다."),
     VERIFICATION_NOT_COMPLETED(HttpStatus.BAD_REQUEST, "문자 인증이 완료되지 않았습니다."),
-    VERIFICATION_PURPOSE_MISMATCH(HttpStatus.BAD_REQUEST, "이 동의에 사용할 수 없는 인증입니다.");
+    VERIFICATION_PURPOSE_MISMATCH(HttpStatus.BAD_REQUEST, "이 동의에 사용할 수 없는 인증입니다."),
+
+    // --- 회원가입 계정 프로필 / 가입용 문자 인증 ---
+    DUPLICATE_PHONE(HttpStatus.CONFLICT, "이미 가입된 휴대폰 번호입니다."),
+    VERIFICATION_ALREADY_COMPLETED(HttpStatus.CONFLICT, "이미 인증이 완료된 요청입니다. 가입을 계속 진행해주세요.");
 
     private final HttpStatus status;
     private final String defaultMessage;

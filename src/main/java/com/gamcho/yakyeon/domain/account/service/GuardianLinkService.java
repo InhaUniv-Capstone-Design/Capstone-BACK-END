@@ -20,7 +20,7 @@ import com.gamcho.yakyeon.domain.account.repository.GuardianLinkRepository;
 import com.gamcho.yakyeon.domain.account.repository.PatientRepository;
 import com.gamcho.yakyeon.domain.account.repository.PhoneVerificationRepository;
 import com.gamcho.yakyeon.domain.account.repository.TermsVersionRepository;
-import com.gamcho.yakyeon.security.TokenHasher;
+import com.gamcho.yakyeon.security.PhoneHasher;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -43,7 +43,7 @@ public class GuardianLinkService {
     private final PhoneVerificationRepository phoneVerificationRepository;
     private final ConsentLogRepository consentLogRepository;
     private final TermsVersionRepository termsVersionRepository;
-    private final TokenHasher tokenHasher;
+    private final PhoneHasher phoneHasher;
 
     /**
      * 전화번호로 기존 복약자 조회 (연동 요청을 보내기 전 대상 찾기).
@@ -62,7 +62,7 @@ public class GuardianLinkService {
         }
 
         return patientRepository
-                .findAllByPhoneHashAndStatus(tokenHasher.sha256Hex(phone), Patient.PatientStatus.ACTIVE).stream()
+                .findAllByPhoneHashAndStatus(phoneHasher.hash(phone), Patient.PatientStatus.ACTIVE).stream()
                 .map(p -> new PatientSearchResponse(p.getPatientId(), maskName(p.getName()), p.getUser() != null))
                 .toList();
     }
