@@ -7,6 +7,8 @@ import com.gamcho.yakyeon.domain.account.access.PatientAccessGuard;
 import com.gamcho.yakyeon.domain.account.entity.AppUser;
 import com.gamcho.yakyeon.domain.account.repository.AppUserRepository;
 import com.gamcho.yakyeon.domain.drug.entity.Drug;
+import com.gamcho.yakyeon.domain.interaction.entity.InteractionCheck;
+import com.gamcho.yakyeon.domain.interaction.service.InteractionService;
 import com.gamcho.yakyeon.domain.medication.dto.MedicationItem;
 import com.gamcho.yakyeon.domain.medication.dto.PrescriptionCreateRequest;
 import com.gamcho.yakyeon.domain.medication.dto.PrescriptionCreateResponse;
@@ -32,6 +34,7 @@ public class PrescriptionService {
     private final MedicationInputValidator medicationInputValidator;
     private final PrescriptionRepository prescriptionRepository;
     private final PatientMedicationRepository patientMedicationRepository;
+    private final InteractionService interactionService;
 
     /**
      * 처방 등록. 처방 1건과 그 안의 모든 약, 약별 복용 시기를 한 트랜잭션으로 저장한다 -
@@ -86,7 +89,8 @@ public class PrescriptionService {
             medicationIds.add(saved.getMedicationId());
         }
 
-        // TODO(⑤ 병용금기): 약이 추가됐으므로 이 복약자의 병용금기 재검사를 여기서 호출한다 (trigger_type = MED_ADD)
+        // 약이 추가됐으므로 이 복약자의 병용금기를 다시 검사해서 저장한다 (같은 트랜잭션이라 방금 저장한 약이 보인다)
+        interactionService.recheck(access.patient().getPatientId(), InteractionCheck.TriggerType.MED_ADD);
 
         return new PrescriptionCreateResponse(prescription.getPrescriptionId(), medicationIds);
     }

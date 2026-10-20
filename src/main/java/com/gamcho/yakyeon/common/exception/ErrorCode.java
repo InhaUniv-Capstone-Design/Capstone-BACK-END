@@ -70,7 +70,10 @@ public enum ErrorCode {
 
     // --- 회원가입 계정 프로필 / 가입용 문자 인증 ---
     DUPLICATE_PHONE(HttpStatus.CONFLICT, "이미 가입된 휴대폰 번호입니다."),
-    VERIFICATION_ALREADY_COMPLETED(HttpStatus.CONFLICT, "이미 인증이 완료된 요청입니다. 가입을 계속 진행해주세요.");
+    VERIFICATION_ALREADY_COMPLETED(HttpStatus.CONFLICT, "이미 인증이 완료된 요청입니다. 가입을 계속 진행해주세요."),
+
+    // --- 병용금기 ---
+    INTERACTION_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 병용금기 정보입니다.");
 
     private final HttpStatus status;
     private final String defaultMessage;
