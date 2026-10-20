@@ -6,6 +6,8 @@ import com.gamcho.yakyeon.common.util.ApiTime;
 import com.gamcho.yakyeon.domain.account.access.AccessAction;
 import com.gamcho.yakyeon.domain.account.access.PatientAccessGuard;
 import com.gamcho.yakyeon.domain.drug.entity.Drug;
+import com.gamcho.yakyeon.domain.interaction.entity.InteractionCheck;
+import com.gamcho.yakyeon.domain.interaction.service.InteractionService;
 import com.gamcho.yakyeon.domain.medication.dto.MedicationItem;
 import com.gamcho.yakyeon.domain.medication.dto.MedicationResponse;
 import com.gamcho.yakyeon.domain.medication.entity.MedicationStatus;
@@ -40,6 +42,7 @@ public class MedicationService {
     private final PatientAccessGuard patientAccessGuard;
     private final PatientMedicationRepository patientMedicationRepository;
     private final MedicationInputValidator medicationInputValidator;
+    private final InteractionService interactionService;
 
     /**
      * 복약자의 약 목록 (삭제된 약 제외).
@@ -86,7 +89,8 @@ public class MedicationService {
                 item.getStartDate() != null ? item.getStartDate() : medication.getStartDate(),
                 v.slots());
 
-        // TODO(⑤ 병용금기): 약이 바뀌었으므로 이 복약자의 병용금기 재검사를 여기서 호출한다 (trigger_type = MED_UPDATE)
+        // 약이 바뀌었으므로 이 복약자의 병용금기를 다시 검사해서 저장한다
+        interactionService.recheck(medication.getPatient().getPatientId(), InteractionCheck.TriggerType.MED_UPDATE);
 
         return MedicationResponse.from(medication, ApiTime.today());
     }
@@ -99,7 +103,8 @@ public class MedicationService {
 
         medication.softDelete();
 
-        // TODO(⑤ 병용금기): 병용금기 재검사 (trigger_type = MED_DELETE)
+        // 약이 삭제됐으므로 이 복약자의 병용금기를 다시 검사해서 저장한다 (삭제한 약이 걸린 결과가 빠진다)
+        interactionService.recheck(medication.getPatient().getPatientId(), InteractionCheck.TriggerType.MED_DELETE);
         // TODO(⑥ 스케줄): 아직 판정 전(PENDING)인 이 약의 예정 복용을 삭제한다 (이미 판정된 기록은 보관)
         // TODO(⑦ 약통): 이 약이 배정된 칸 배정을 종료(ENDED)한다
     }
