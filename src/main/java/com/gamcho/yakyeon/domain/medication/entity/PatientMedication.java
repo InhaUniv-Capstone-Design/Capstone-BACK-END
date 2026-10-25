@@ -1,8 +1,10 @@
 package com.gamcho.yakyeon.domain.medication.entity;
 
+import com.gamcho.yakyeon.common.util.ApiTime;
 import com.gamcho.yakyeon.domain.account.entity.AppUser;
 import com.gamcho.yakyeon.domain.account.entity.Patient;
 import com.gamcho.yakyeon.domain.drug.entity.Drug;
+import com.gamcho.yakyeon.domain.medication.logic.MedicationEnding;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -27,6 +29,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashSet;
@@ -123,6 +126,13 @@ public class PatientMedication {
 
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
+
+    /**
+     * 사용자가 "복용 종료"를 누른 시각 (팀 스키마 26-10-18). 이 시각 이후의 예정에는 이 약이 포함되지 않는다.
+     * 종료일(end_date)이 지나서 자연스럽게 끝난 약은 값이 없다. 처방 전체를 종료한 경우는 Prescription.endedAt을 본다.
+     */
+    @Column(name = "ended_at")
+    private OffsetDateTime endedAt;
 
     /** 아침·점심·저녁 중 언제 복용하는지. 약과 함께 저장·삭제된다 */
     @OneToMany(mappedBy = "medication", cascade = CascadeType.ALL, orphanRemoval = true)
@@ -242,6 +252,20 @@ public class PatientMedication {
         return deletedAt != null;
     }
 
+    /** 복용 종료를 누른 시각을 기록한다. 이미 지난 복용 기록은 바뀌지 않는다 */
+    public void end(OffsetDateTime when) {
+        this.endedAt = when;
+    }
+
+    /**
+     * 사용자가 종료한 한국 날짜 (이 약을 직접 종료했거나, 이 약이 속한 처방 전체가 종료된 경우).
+     * 종료된 적이 없으면 null. 자연스럽게 기간이 끝난 약은 null이다 - 그 경우는 getEndDate()를 본다.
+     */
+    public LocalDate getEndedOn() {
+        return MedicationEnding.endedOn(endedAt, prescription == null ? null : prescription.getEndedAt(),
+                ApiTime.SERVICE_ZONE);
+    }
+
     /** 복용 종료일 = 시작일 + 투약일수 - 1. DB 생성 컬럼과 같은 식이라 저장 직후에도 사용할 수 있다 */
     public LocalDate getEndDate() {
         if (startDate == null || totalDays == null) {
@@ -252,9 +276,14 @@ public class PatientMedication {
 
     /**
      * 기준일 기준의 복용 상태. 시작일 전이면 UPCOMING, 종료일 뒤면 ENDED, 그 사이(양 끝 포함)면 ACTIVE.
+     * 사용자가 복용 종료를 누른 경우(약 또는 처방 전체)는 종료한 날부터 ENDED다.
      * 삭제된 약(deleted_at)은 이 계산 대상이 아니다 - 조회에서 먼저 제외해야 한다.
      */
     public MedicationStatus statusOn(LocalDate date) {
+        // 사용자가 종료한 날부터는 종료된 약. 시작 전(UPCOMING)인 약도 처방 전체를 종료하면 함께 종료된다
+        if (MedicationEnding.isEndedOn(date, getEndedOn())) {
+            return MedicationStatus.ENDED;
+        }
         if (date.isBefore(startDate)) {
             return MedicationStatus.UPCOMING;
         }

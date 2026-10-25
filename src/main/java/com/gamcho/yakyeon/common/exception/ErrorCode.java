@@ -73,7 +73,13 @@ public enum ErrorCode {
     VERIFICATION_ALREADY_COMPLETED(HttpStatus.CONFLICT, "이미 인증이 완료된 요청입니다. 가입을 계속 진행해주세요."),
 
     // --- 병용금기 ---
-    INTERACTION_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 병용금기 정보입니다.");
+    INTERACTION_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 병용금기 정보입니다."),
+
+    // --- 복용 종료 ---
+    MEDICATION_ALREADY_ENDED(HttpStatus.CONFLICT, "이미 복용이 끝난 약입니다."),
+    MEDICATION_NOT_STARTED(HttpStatus.CONFLICT, "아직 복용을 시작하지 않은 약은 종료할 수 없습니다. 삭제해주세요."),
+    PRESCRIPTION_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 처방 정보입니다."),
+    PRESCRIPTION_ALREADY_ENDED(HttpStatus.CONFLICT, "이미 복용이 끝난 약봉지입니다.");
 
     private final HttpStatus status;
     private final String defaultMessage;

@@ -21,6 +21,7 @@ import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 
 /**
  * 처방전 한 장 단위의 묶음 (prescription). 병원별 처방 조회와 약 묶음(조제 봉지)의 기준.
@@ -69,6 +70,13 @@ public class Prescription {
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
+    /**
+     * 처방(약봉지) 전체의 "복용 종료" 시각 (팀 스키마 26-10-18). 종료하면 이 처방의 모든 약이 이 시각 이후의
+     * 예정에서 빠지고, 배정된 약통 칸이 비워진다. 지난 복용 기록은 그대로 남는다.
+     */
+    @Column(name = "ended_at")
+    private OffsetDateTime endedAt;
+
     @Builder
     public Prescription(Patient patient, Source source, String hospitalName, String pharmacyName,
                         LocalDate prescribedDate, AppUser createdBy) {
@@ -80,6 +88,14 @@ public class Prescription {
         this.createdBy = createdBy;
         this.imageRetained = false;
         this.imagePath = null;
+    }
+
+    public boolean isEnded() {
+        return endedAt != null;
+    }
+
+    public void end(OffsetDateTime when) {
+        this.endedAt = when;
     }
 
     @PrePersist
