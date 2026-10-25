@@ -79,7 +79,11 @@ public enum ErrorCode {
     MEDICATION_ALREADY_ENDED(HttpStatus.CONFLICT, "이미 복용이 끝난 약입니다."),
     MEDICATION_NOT_STARTED(HttpStatus.CONFLICT, "아직 복용을 시작하지 않은 약은 종료할 수 없습니다. 삭제해주세요."),
     PRESCRIPTION_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 처방 정보입니다."),
-    PRESCRIPTION_ALREADY_ENDED(HttpStatus.CONFLICT, "이미 복용이 끝난 약봉지입니다.");
+    PRESCRIPTION_ALREADY_ENDED(HttpStatus.CONFLICT, "이미 복용이 끝난 약봉지입니다."),
+
+    // --- 복용 시각 설정 ---
+    INVALID_SCHEDULE(HttpStatus.BAD_REQUEST, "복용 시각이 올바르지 않습니다."),
+    SCHEDULE_CONFLICT(HttpStatus.CONFLICT, "다른 곳에서 동시에 복용 시각을 바꾸고 있습니다. 잠시 후 다시 시도해주세요.");
 
     private final HttpStatus status;
     private final String defaultMessage;
