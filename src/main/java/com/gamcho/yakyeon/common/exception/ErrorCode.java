@@ -83,7 +83,10 @@ public enum ErrorCode {
 
     // --- 복용 시각 설정 ---
     INVALID_SCHEDULE(HttpStatus.BAD_REQUEST, "복용 시각이 올바르지 않습니다."),
-    SCHEDULE_CONFLICT(HttpStatus.CONFLICT, "다른 곳에서 동시에 복용 시각을 바꾸고 있습니다. 잠시 후 다시 시도해주세요.");
+    SCHEDULE_CONFLICT(HttpStatus.CONFLICT, "다른 곳에서 동시에 복용 시각을 바꾸고 있습니다. 잠시 후 다시 시도해주세요."),
+
+    // --- 복용 일정 조회 ---
+    INVALID_QUERY(HttpStatus.BAD_REQUEST, "조회 조건이 올바르지 않습니다.");
 
     private final HttpStatus status;
     private final String defaultMessage;
