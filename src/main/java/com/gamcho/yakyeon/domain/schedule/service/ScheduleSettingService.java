@@ -5,6 +5,7 @@ import com.gamcho.yakyeon.common.exception.ErrorCode;
 import com.gamcho.yakyeon.common.util.ApiTime;
 import com.gamcho.yakyeon.domain.account.access.AccessAction;
 import com.gamcho.yakyeon.domain.account.access.PatientAccessGuard;
+import com.gamcho.yakyeon.domain.dose.service.DoseScheduleService;
 import com.gamcho.yakyeon.domain.medication.entity.MedicationStatus;
 import com.gamcho.yakyeon.domain.medication.entity.MedicationTiming;
 import com.gamcho.yakyeon.domain.medication.entity.PatientMedication;
@@ -53,6 +54,7 @@ public class ScheduleSettingService {
     private final PrescriptionRepository prescriptionRepository;
     private final PatientMedicationRepository patientMedicationRepository;
     private final ScheduleSettingRepository scheduleSettingRepository;
+    private final DoseScheduleService doseScheduleService;
 
     @Transactional(readOnly = true)
     public ScheduleSettingResponse get(Long userId, Long prescriptionId) {
@@ -90,6 +92,8 @@ public class ScheduleSettingService {
             // 같은 처방의 시각을 동시에 바꾸면 "현재 설정은 하나뿐"이라는 DB 규칙에 걸린다
             throw new BusinessException(ErrorCode.SCHEDULE_CONFLICT);
         }
+        // 시각이 바뀌었으니 앞으로 7일치 예정을 새 시각에 맞춘다 (이미 판정된 예정은 건드리지 않는다)
+        doseScheduleService.reconcile(prescriptionId);
         return toResponse(prescriptionId, scheduleSettingRepository.findByPrescriptionIdAndEffectiveToIsNull(prescriptionId));
     }
 

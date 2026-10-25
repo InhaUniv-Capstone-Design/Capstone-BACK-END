@@ -5,6 +5,7 @@ import com.gamcho.yakyeon.common.exception.ErrorCode;
 import com.gamcho.yakyeon.common.util.ApiTime;
 import com.gamcho.yakyeon.domain.account.access.AccessAction;
 import com.gamcho.yakyeon.domain.account.access.PatientAccessGuard;
+import com.gamcho.yakyeon.domain.dose.service.DoseScheduleService;
 import com.gamcho.yakyeon.domain.interaction.entity.InteractionCheck;
 import com.gamcho.yakyeon.domain.interaction.service.InteractionService;
 import com.gamcho.yakyeon.domain.medication.dto.MedicationResponse;
@@ -42,6 +43,7 @@ public class MedicationEndService {
     private final PatientMedicationRepository patientMedicationRepository;
     private final PrescriptionRepository prescriptionRepository;
     private final InteractionService interactionService;
+    private final DoseScheduleService doseScheduleService;
     private final JdbcTemplate jdbcTemplate;
 
     /** 약 한 건 종료. 지금 복용 중인 약만 종료할 수 있다 (시작 전인 약은 삭제, 이미 끝난 약은 거절) */
@@ -63,6 +65,10 @@ public class MedicationEndService {
 
         medication.end(OffsetDateTime.now(ApiTime.SERVICE_ZONE));
         afterEnded(patientId);
+        // 종료 이후의 판정 전 예정에서 이 약이 빠진다 (이 약만 있던 시간대의 예정은 지워진다)
+        if (medication.getPrescription() != null) {
+            doseScheduleService.reconcile(medication.getPrescription().getPrescriptionId());
+        }
         return MedicationResponse.from(medication, today);
     }
 
@@ -89,6 +95,8 @@ public class MedicationEndService {
 
         prescription.end(OffsetDateTime.now(ApiTime.SERVICE_ZONE));
         afterEnded(patientId);
+        // 처방이 끝났으니 이 처방의 판정 전 예정이 모두 지워진다 (판정된 기록은 보관)
+        doseScheduleService.reconcile(prescriptionId);
         return new PrescriptionEndResponse(prescriptionId, prescription.getEndedAt(), stillOpen.size());
     }
 
