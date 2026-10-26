@@ -93,7 +93,13 @@ public enum ErrorCode {
     DOSE_EXPIRED(HttpStatus.CONFLICT, "당일 기록만 바꿀 수 있습니다. 지난 날의 복용 기록은 수정할 수 없습니다."),
     DOSE_NOT_DECIDED(HttpStatus.CONFLICT, "아직 기록이 없는 복용 예정입니다."),
     INVALID_TAKEN_AT(HttpStatus.BAD_REQUEST, "복용 시각이 올바르지 않습니다."),
-    DOSE_RECORD_FAILED(HttpStatus.CONFLICT, "복용 기록을 처리하지 못했습니다. 잠시 후 다시 시도해주세요.");
+    DOSE_RECORD_FAILED(HttpStatus.CONFLICT, "복용 기록을 처리하지 못했습니다. 잠시 후 다시 시도해주세요."),
+
+    // --- 약통 ---
+    DEVICE_NOT_FOUND(HttpStatus.NOT_FOUND, "등록된 약통이 없습니다."),
+    DEVICE_ALREADY_REGISTERED(HttpStatus.CONFLICT, "이미 등록된 약통이 있습니다. 먼저 해제해주세요."),
+    DEVICE_SERIAL_IN_USE(HttpStatus.CONFLICT, "이미 다른 복약자에게 등록된 약통입니다."),
+    DEVICE_AUTH_FAILED(HttpStatus.UNAUTHORIZED, "기기 인증에 실패했습니다.");
 
     private final HttpStatus status;
     private final String defaultMessage;
