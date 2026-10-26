@@ -86,7 +86,14 @@ public enum ErrorCode {
     SCHEDULE_CONFLICT(HttpStatus.CONFLICT, "다른 곳에서 동시에 복용 시각을 바꾸고 있습니다. 잠시 후 다시 시도해주세요."),
 
     // --- 복용 일정 조회 ---
-    INVALID_QUERY(HttpStatus.BAD_REQUEST, "조회 조건이 올바르지 않습니다.");
+    INVALID_QUERY(HttpStatus.BAD_REQUEST, "조회 조건이 올바르지 않습니다."),
+
+    // --- 복용 기록·정정 ---
+    DOSE_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 복용 예정입니다."),
+    DOSE_EXPIRED(HttpStatus.CONFLICT, "당일 기록만 바꿀 수 있습니다. 지난 날의 복용 기록은 수정할 수 없습니다."),
+    DOSE_NOT_DECIDED(HttpStatus.CONFLICT, "아직 기록이 없는 복용 예정입니다."),
+    INVALID_TAKEN_AT(HttpStatus.BAD_REQUEST, "복용 시각이 올바르지 않습니다."),
+    DOSE_RECORD_FAILED(HttpStatus.CONFLICT, "복용 기록을 처리하지 못했습니다. 잠시 후 다시 시도해주세요.");
 
     private final HttpStatus status;
     private final String defaultMessage;

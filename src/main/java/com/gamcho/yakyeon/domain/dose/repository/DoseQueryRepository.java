@@ -1,5 +1,6 @@
 package com.gamcho.yakyeon.domain.dose.repository;
 
+import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -11,6 +12,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.ArrayList;
+import java.util.Optional;
 
 /**
  * 복용 일정(예정) 조회용 SQL. 화면 한 장이 예정, 처방(병원 이름), 약 목록, 정정 여부를 한꺼번에 필요로 해서
@@ -35,6 +37,20 @@ public class DoseQueryRepository {
     public record ItemRow(long doseId, long medicationId, String name, BigDecimal dosePerIntake) {
     }
 
+    private static final String SELECT_DOSE =
+            "SELECT d.scheduled_dose_id, d.prescription_id, p.hospital_name, d.timing_slot, "
+                    + "       d.scheduled_at, d.normal_until, d.close_at, d.status, d.taken_at, d.decision_source, "
+                    + "       EXISTS (SELECT 1 FROM dose_correction_log c WHERE c.scheduled_dose_id = d.scheduled_dose_id) AS corrected "
+                    + "  FROM scheduled_dose d JOIN prescription p ON p.prescription_id = d.prescription_id ";
+
+    private static final RowMapper<DoseRow> DOSE_MAPPER = (rs, n) -> new DoseRow(
+            rs.getLong("scheduled_dose_id"), rs.getLong("prescription_id"), rs.getString("hospital_name"),
+            rs.getString("timing_slot"),
+            rs.getObject("scheduled_at", OffsetDateTime.class), rs.getObject("normal_until", OffsetDateTime.class),
+            rs.getObject("close_at", OffsetDateTime.class), rs.getString("status"),
+            rs.getObject("taken_at", OffsetDateTime.class), rs.getString("decision_source"),
+            rs.getBoolean("corrected"));
+
     /**
      * @param from       이 시각 이상
      * @param to         이 시각 미만
@@ -45,12 +61,8 @@ public class DoseQueryRepository {
                                    List<String> statuses, boolean descending) {
         // 정렬 방향은 호출하는 쪽의 boolean으로 고르는 고정 문자열이다 (사용자 입력을 이어 붙이지 않는다)
         String direction = descending ? "DESC" : "ASC";
-        StringBuilder sql = new StringBuilder(
-                "SELECT d.scheduled_dose_id, d.prescription_id, p.hospital_name, d.timing_slot, "
-                        + "       d.scheduled_at, d.normal_until, d.close_at, d.status, d.taken_at, d.decision_source, "
-                        + "       EXISTS (SELECT 1 FROM dose_correction_log c WHERE c.scheduled_dose_id = d.scheduled_dose_id) AS corrected "
-                        + "  FROM scheduled_dose d JOIN prescription p ON p.prescription_id = d.prescription_id "
-                        + " WHERE d.patient_id = :patientId AND d.scheduled_at >= :from AND d.scheduled_at < :to ");
+        StringBuilder sql = new StringBuilder(SELECT_DOSE)
+                .append(" WHERE d.patient_id = :patientId AND d.scheduled_at >= :from AND d.scheduled_at < :to ");
         MapSqlParameterSource params = new MapSqlParameterSource()
                 .addValue("patientId", patientId)
                 .addValue("from", from)
@@ -61,14 +73,14 @@ public class DoseQueryRepository {
         }
         sql.append(" ORDER BY d.scheduled_at ").append(direction)
                 .append(", d.scheduled_dose_id ").append(direction);
+        return jdbc.query(sql.toString(), params, DOSE_MAPPER);
+    }
 
-        return jdbc.query(sql.toString(), params, (rs, n) -> new DoseRow(
-                rs.getLong("scheduled_dose_id"), rs.getLong("prescription_id"), rs.getString("hospital_name"),
-                rs.getString("timing_slot"),
-                rs.getObject("scheduled_at", OffsetDateTime.class), rs.getObject("normal_until", OffsetDateTime.class),
-                rs.getObject("close_at", OffsetDateTime.class), rs.getString("status"),
-                rs.getObject("taken_at", OffsetDateTime.class), rs.getString("decision_source"),
-                rs.getBoolean("corrected")));
+    /** 예정 한 건 (방금 기록·정정한 예정을 응답으로 돌려줄 때) */
+    public Optional<DoseRow> findDoseById(long doseId) {
+        return jdbc.query(SELECT_DOSE + " WHERE d.scheduled_dose_id = :id",
+                        new MapSqlParameterSource("id", doseId), DOSE_MAPPER)
+                .stream().findFirst();
     }
 
     /** 예정마다 그 시간대에 먹는 약 목록 */

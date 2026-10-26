@@ -129,6 +129,17 @@ public class DoseQueryService {
                 next);
     }
 
+    /**
+     * 예정 한 건을 응답 형식으로. 방금 기록·정정한 결과를 돌려줄 때 쓰고, 권한 확인은 부르는 쪽에서 이미 했다
+     * (같은 패키지의 DoseRecordService만 쓰도록 공개 범위를 좁혔다).
+     */
+    DoseResponse find(Long doseId) {
+        DoseQueryRepository.DoseRow row = doseQueryRepository.findDoseById(doseId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.DOSE_NOT_FOUND));
+        Map<Long, List<DoseQueryRepository.ItemRow>> items = doseQueryRepository.findItems(List.of(doseId));
+        return toResponse(row, items.get(doseId));
+    }
+
     // ------------------------------------------------------------------ 내부
 
     private List<DoseQueryRepository.DoseRow> findDay(Long patientId, LocalDate day) {
