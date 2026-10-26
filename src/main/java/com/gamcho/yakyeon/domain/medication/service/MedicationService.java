@@ -5,6 +5,7 @@ import com.gamcho.yakyeon.common.exception.ErrorCode;
 import com.gamcho.yakyeon.common.util.ApiTime;
 import com.gamcho.yakyeon.domain.account.access.AccessAction;
 import com.gamcho.yakyeon.domain.account.access.PatientAccessGuard;
+import com.gamcho.yakyeon.domain.dose.service.DoseScheduleService;
 import com.gamcho.yakyeon.domain.drug.entity.Drug;
 import com.gamcho.yakyeon.domain.interaction.entity.InteractionCheck;
 import com.gamcho.yakyeon.domain.interaction.service.InteractionService;
@@ -43,6 +44,7 @@ public class MedicationService {
     private final PatientMedicationRepository patientMedicationRepository;
     private final MedicationInputValidator medicationInputValidator;
     private final InteractionService interactionService;
+    private final DoseScheduleService doseScheduleService;
 
     /**
      * 복약자의 약 목록 (삭제된 약 제외).
@@ -91,6 +93,7 @@ public class MedicationService {
 
         // 약이 바뀌었으므로 이 복약자의 병용금기를 다시 검사해서 저장한다
         interactionService.recheck(medication.getPatient().getPatientId(), InteractionCheck.TriggerType.MED_UPDATE);
+        reconcileDoses(medication);
 
         return MedicationResponse.from(medication, ApiTime.today());
     }
@@ -105,7 +108,8 @@ public class MedicationService {
 
         // 약이 삭제됐으므로 이 복약자의 병용금기를 다시 검사해서 저장한다 (삭제한 약이 걸린 결과가 빠진다)
         interactionService.recheck(medication.getPatient().getPatientId(), InteractionCheck.TriggerType.MED_DELETE);
-        // TODO(⑥ 스케줄): 아직 판정 전(PENDING)인 이 약의 예정 복용을 삭제한다 (이미 판정된 기록은 보관)
+        // 이 약만 있던 시간대의 판정 전 예정이 지워진다 (이미 판정된 기록은 보관된다)
+        reconcileDoses(medication);
         // TODO(⑦ 약통): 이 약이 배정된 칸 배정을 종료(ENDED)한다
     }
 
@@ -130,6 +134,13 @@ public class MedicationService {
                 throw new BusinessException(ErrorCode.MEDICATION_NOT_FOUND);
             }
             throw e;
+        }
+    }
+
+    /** 약이 바뀌었으니 이 약이 속한 처방의 앞으로 7일치 예정을 다시 맞춘다 */
+    private void reconcileDoses(PatientMedication medication) {
+        if (medication.getPrescription() != null) {
+            doseScheduleService.reconcile(medication.getPrescription().getPrescriptionId());
         }
     }
 
