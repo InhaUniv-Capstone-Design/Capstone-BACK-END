@@ -99,7 +99,16 @@ public enum ErrorCode {
     DEVICE_NOT_FOUND(HttpStatus.NOT_FOUND, "등록된 약통이 없습니다."),
     DEVICE_ALREADY_REGISTERED(HttpStatus.CONFLICT, "이미 등록된 약통이 있습니다. 먼저 해제해주세요."),
     DEVICE_SERIAL_IN_USE(HttpStatus.CONFLICT, "이미 다른 복약자에게 등록된 약통입니다."),
-    DEVICE_AUTH_FAILED(HttpStatus.UNAUTHORIZED, "기기 인증에 실패했습니다.");
+    DEVICE_AUTH_FAILED(HttpStatus.UNAUTHORIZED, "기기 인증에 실패했습니다."),
+
+    // --- 약통 칸 배정 ---
+    COMPARTMENT_MAPPING_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 칸 배정입니다."),
+    COMPARTMENT_OCCUPIED(HttpStatus.CONFLICT, "이미 다른 약봉지가 배정된 칸입니다."),
+    PRESCRIPTION_ALREADY_ASSIGNED(HttpStatus.CONFLICT, "이미 약통 칸에 배정된 약봉지입니다."),
+    INVALID_COMPARTMENT_NO(HttpStatus.BAD_REQUEST, "이 약통에 없는 칸 번호입니다."),
+    MAPPING_NOT_PENDING_LOAD(HttpStatus.CONFLICT, "이미 충전이 확인된 칸입니다."),
+    MAPPING_NOT_ACTIVE(HttpStatus.CONFLICT, "충전이 확인된 칸만 추가로 채울 수 있습니다."),
+    MAPPING_ALREADY_ENDED(HttpStatus.CONFLICT, "이미 해제된 칸 배정입니다.");
 
     private final HttpStatus status;
     private final String defaultMessage;
