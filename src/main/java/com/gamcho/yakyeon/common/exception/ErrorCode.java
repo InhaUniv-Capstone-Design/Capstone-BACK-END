@@ -108,7 +108,10 @@ public enum ErrorCode {
     INVALID_COMPARTMENT_NO(HttpStatus.BAD_REQUEST, "이 약통에 없는 칸 번호입니다."),
     MAPPING_NOT_PENDING_LOAD(HttpStatus.CONFLICT, "이미 충전이 확인된 칸입니다."),
     MAPPING_NOT_ACTIVE(HttpStatus.CONFLICT, "충전이 확인된 칸만 추가로 채울 수 있습니다."),
-    MAPPING_ALREADY_ENDED(HttpStatus.CONFLICT, "이미 해제된 칸 배정입니다.");
+    MAPPING_ALREADY_ENDED(HttpStatus.CONFLICT, "이미 해제된 칸 배정입니다."),
+
+    // --- 약통 신호 ---
+    INVALID_SIGNAL(HttpStatus.BAD_REQUEST, "약통 신호의 내용이 올바르지 않습니다.");
 
     private final HttpStatus status;
     private final String defaultMessage;

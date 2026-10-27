@@ -46,7 +46,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/revocations/request", "/revocations/confirm").permitAll()
                         // 약통(기기)이 보내는 요청 - 사람의 로그인 토큰이 없어서 JWT 대신 기기의 시리얼번호·비밀값
                         // 헤더로 인증한다 (DeviceAuthService). 기기용 경로는 새로 만들 때마다 여기에 하나씩 추가한다
-                        .requestMatchers(HttpMethod.POST, "/device/heartbeat").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/device/heartbeat", "/device/signals").permitAll()
                         // 앞으로 patient/medication 등 새 컨트롤러를 추가해도 기본은 "인증 필요" -
                         // 개별 엔드포인트를 열어주려면 여기에 명시적으로 추가해야 하므로,
                         // "깜빡하고 인증 없이 노출"되는 실수를 구조적으로 막는다.
