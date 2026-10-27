@@ -111,7 +111,11 @@ public enum ErrorCode {
     MAPPING_ALREADY_ENDED(HttpStatus.CONFLICT, "이미 해제된 칸 배정입니다."),
 
     // --- 약통 신호 ---
-    INVALID_SIGNAL(HttpStatus.BAD_REQUEST, "약통 신호의 내용이 올바르지 않습니다.");
+    INVALID_SIGNAL(HttpStatus.BAD_REQUEST, "약통 신호의 내용이 올바르지 않습니다."),
+
+    // --- 알림 ---
+    NOTIFICATION_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 알림입니다."),
+    INVALID_NOTIFICATION_SETTING(HttpStatus.BAD_REQUEST, "알림 설정 요청이 올바르지 않습니다.");
 
     private final HttpStatus status;
     private final String defaultMessage;
