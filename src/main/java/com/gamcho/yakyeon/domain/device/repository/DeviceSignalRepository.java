@@ -111,25 +111,38 @@ public class DeviceSignalRepository {
     }
 
     /**
-     * 복용 이벤트를 저장한다. 예정(scheduled_dose_id)이 있으면 DB 규칙(트리거)이 그 예정을 판정 결과로 바꾼다
-     * (상태, 판정 시각, 복용 시각, 판정 주체 DEVICE).
+     * 복용 이벤트를 저장하고 만들어진 이벤트 번호를 돌려준다. 예정(scheduled_dose_id)이 있으면 DB 규칙(트리거)이
+     * 그 예정을 판정 결과로 바꾼다 (상태, 판정 시각, 복용 시각, 판정 주체 DEVICE).
      */
-    public void insertIntakeEvent(long patientId, long deviceId, long mappingId, int compartmentNo, long prescriptionId,
+    public long insertIntakeEvent(long patientId, long deviceId, long mappingId, int compartmentNo, long prescriptionId,
                                   Long irSignalId, Long buttonSignalId, String detection,
                                   OffsetDateTime occurredAt, OffsetDateTime confirmedAt,
                                   Long scheduledDoseId, String timingSlot, String judgement, Integer remainingAfter) {
-        jdbc.update("INSERT INTO intake_event (patient_id, device_id, mapping_id, compartment_no, prescription_id, "
+        return jdbc.query("INSERT INTO intake_event (patient_id, device_id, mapping_id, compartment_no, prescription_id, "
                         + "ir_signal_id, button_signal_id, detection, occurred_at, confirmed_at, "
                         + "scheduled_dose_id, timing_slot, judgement, remaining_after) "
                         + "VALUES (:patientId, :deviceId, :mappingId, :no, :prescriptionId, :ir, :button, :detection, "
-                        + ":occurredAt, :confirmedAt, :doseId, :slot, :judgement, :remainingAfter)",
+                        + ":occurredAt, :confirmedAt, :doseId, :slot, :judgement, :remainingAfter) RETURNING intake_event_id",
                 new MapSqlParameterSource().addValue("patientId", patientId).addValue("deviceId", deviceId)
                         .addValue("mappingId", mappingId).addValue("no", compartmentNo)
                         .addValue("prescriptionId", prescriptionId).addValue("ir", irSignalId)
                         .addValue("button", buttonSignalId).addValue("detection", detection)
                         .addValue("occurredAt", occurredAt).addValue("confirmedAt", confirmedAt)
                         .addValue("doseId", scheduledDoseId).addValue("slot", timingSlot)
-                        .addValue("judgement", judgement).addValue("remainingAfter", remainingAfter));
+                        .addValue("judgement", judgement).addValue("remainingAfter", remainingAfter),
+                (rs, n) -> rs.getLong(1)).get(0);
+    }
+
+    /**
+     * 남은 약봉지가 기준 이하가 됐고 아직 알리지 않았다면 "알림 보냄"으로 표시하고 true를 돌려준다.
+     * 한 문장으로 확인과 표시를 함께 해서, 같은 칸의 부족 알림이 두 번 나가지 않는다.
+     * 약을 더 채워서 기준을 넘으면 표시가 초기화되어(CompartmentMapping.refill) 다시 알릴 수 있다.
+     */
+    public boolean markLowStockNotifiedIfNeeded(long mappingId) {
+        return !jdbc.query("UPDATE compartment_mapping SET low_stock_notified = true WHERE mapping_id = :id "
+                                + "AND NOT low_stock_notified AND remaining_count <= low_stock_threshold RETURNING mapping_id",
+                        new MapSqlParameterSource("id", mappingId), (rs, n) -> rs.getLong(1))
+                .isEmpty();
     }
 
     public void markProcessed(Collection<Long> signalIds, OffsetDateTime at) {

@@ -4,8 +4,10 @@ import com.gamcho.yakyeon.common.util.ApiTime;
 import com.gamcho.yakyeon.domain.device.dto.DeviceHeartbeatRequest;
 import com.gamcho.yakyeon.domain.device.dto.DeviceHeartbeatResponse;
 import com.gamcho.yakyeon.domain.device.entity.Device;
+import com.gamcho.yakyeon.domain.device.logic.DeviceFaultRules;
 import com.gamcho.yakyeon.domain.device.logic.StatusReportPolicy;
 import com.gamcho.yakyeon.domain.device.repository.DeviceStatusReportRepository;
+import com.gamcho.yakyeon.domain.notification.service.NotificationCreator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,6 +29,7 @@ public class DeviceStatusService {
 
     private final DeviceAuthService deviceAuthService;
     private final DeviceStatusReportRepository deviceStatusReportRepository;
+    private final NotificationCreator notificationCreator;
 
     @Transactional
     public DeviceHeartbeatResponse heartbeat(String serialNo, String secret, DeviceHeartbeatRequest request) {
@@ -34,12 +37,21 @@ public class DeviceStatusService {
         DeviceHeartbeatRequest r = request == null ? new DeviceHeartbeatRequest() : request;
         OffsetDateTime now = OffsetDateTime.now(ApiTime.SERVICE_ZONE);
 
+        // 이상 알림은 "정상에서 이상으로 바뀌는 순간"에만 보내서, 이전 상태를 갱신하기 전에 붙잡아 둔다
+        Boolean previousIrOk = device.getIrSensorOk();
+        Boolean previousButtonOk = device.getButtonOk();
+
         device.markSeen(now, r.getFirmwareVersion(), r.getIrSensorOk(), r.getButtonOk());
         device.reportScheduleSynced(r.getScheduleSyncedVer(), now);
 
         StatusReportPolicy.Values current = new StatusReportPolicy.Values(
                 r.getIrSensorOk(), r.getButtonOk(), r.getFirmwareVersion(), r.getIrFaultCompartments());
         Optional<DeviceStatusReportRepository.Last> last = deviceStatusReportRepository.findLast(device.getDeviceId());
+        if (DeviceFaultRules.becameFaulty(previousIrOk, previousButtonOk,
+                last.map(l -> l.values().irFaultCompartments()).orElse(null),
+                r.getIrSensorOk(), r.getButtonOk(), r.getIrFaultCompartments())) {
+            notificationCreator.onDeviceFault(device.getPatientId(), device.getDeviceId());
+        }
         if (StatusReportPolicy.shouldRecord(
                 last.map(DeviceStatusReportRepository.Last::values).orElse(null),
                 last.map(DeviceStatusReportRepository.Last::reportedAt).orElse(null),
