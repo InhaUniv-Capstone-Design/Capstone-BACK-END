@@ -11,6 +11,7 @@ import com.gamcho.yakyeon.domain.device.logic.DoseMatcher;
 import com.gamcho.yakyeon.domain.device.logic.SignalPairing;
 import com.gamcho.yakyeon.domain.device.repository.DeviceSignalRepository;
 import com.gamcho.yakyeon.domain.dose.logic.DoseRecordRules;
+import com.gamcho.yakyeon.domain.notification.service.NotificationCreator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -41,6 +42,7 @@ public class DeviceSignalService {
 
     private final DeviceAuthService deviceAuthService;
     private final DeviceSignalRepository signalRepository;
+    private final NotificationCreator notificationCreator;
 
     @Transactional
     public DeviceSignalResponse receive(String serialNo, String secret, DeviceSignalRequest request) {
@@ -125,12 +127,18 @@ public class DeviceSignalService {
         String judgement = dose.map(DoseMatcher.Match::judgement).orElse("UNSCHEDULED");
         int remaining = signalRepository.decrementRemaining(mapping.mappingId());
 
-        signalRepository.insertIntakeEvent(mapping.patientId(), device.getDeviceId(), mapping.mappingId(),
+        long intakeEventId = signalRepository.insertIntakeEvent(mapping.patientId(), device.getDeviceId(), mapping.mappingId(),
                 compartmentNo, mapping.prescriptionId(),
                 irSignalId, signalId, detection, openedAt, pressedAt,
                 dose.map(DoseMatcher.Match::doseId).orElse(null), dose.map(DoseMatcher.Match::slot).orElse(null),
                 judgement, remaining);
         signalRepository.markProcessed(consumed, now);
+
+        // 알림: 복용 확인은 보호자에게, 약봉지가 기준 이하로 줄었으면(칸마다 한 번) 복약자와 보호자에게
+        notificationCreator.onIntakeDetected(mapping.patientId(), intakeEventId, mapping.mappingId(), device.getDeviceId());
+        if (signalRepository.markLowStockNotifiedIfNeeded(mapping.mappingId())) {
+            notificationCreator.onLowStock(mapping.patientId(), mapping.mappingId(), device.getDeviceId());
+        }
         return new DeviceSignalResponse(signalId, detection, judgement,
                 dose.map(DoseMatcher.Match::doseId).orElse(null), remaining);
     }
@@ -169,9 +177,10 @@ public class DeviceSignalService {
                 .forEach(sig -> group.add(sig.signalId()));
         Optional<OffsetDateTime> lastConfirmed = signalRepository.lastConfirmedAt(s.deviceId(), s.compartmentNo());
         if (!SignalPairing.isWithinWindowAfter(lastConfirmed.orElse(null), openedAt, window)) {
-            signalRepository.insertIntakeEvent(mapping.get().patientId(), s.deviceId(), mapping.get().mappingId(),
-                    s.compartmentNo(), mapping.get().prescriptionId(), s.signalId(), null, "OPEN_ONLY",
-                    openedAt, null, null, null, "OPEN_ONLY", null);
+            long intakeEventId = signalRepository.insertIntakeEvent(mapping.get().patientId(), s.deviceId(),
+                    mapping.get().mappingId(), s.compartmentNo(), mapping.get().prescriptionId(), s.signalId(), null,
+                    "OPEN_ONLY", openedAt, null, null, null, "OPEN_ONLY", null);
+            notificationCreator.onDeviceOpened(mapping.get().patientId(), intakeEventId, mapping.get().mappingId(), s.deviceId());
         }
         signalRepository.markProcessed(group.isEmpty() ? List.of(s.signalId()) : group, now);
         return true;
