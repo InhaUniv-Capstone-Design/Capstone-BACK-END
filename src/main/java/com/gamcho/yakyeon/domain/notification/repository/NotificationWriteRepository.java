@@ -6,6 +6,7 @@ import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
 
@@ -25,7 +26,12 @@ import java.util.List;
 public class NotificationWriteRepository {
 
     /** 앱이 알림을 눌렀을 때 이동할 화면을 정하는 데 쓰는 관련 번호들 (없으면 null) */
-    public record Links(Long scheduledDoseId, Long intakeEventId, Long mappingId, Long deviceId) {
+    public record Links(Long scheduledDoseId, Long intakeEventId, Long mappingId, Long deviceId, Long prescriptionId) {
+
+        /** 처방과 관계없는 알림(대부분)은 처방 번호 없이 만든다 */
+        public Links(Long scheduledDoseId, Long intakeEventId, Long mappingId, Long deviceId) {
+            this(scheduledDoseId, intakeEventId, mappingId, deviceId, null);
+        }
     }
 
     /** 1시간이 지났는데 아직 복용이 기록되지 않은 예정 */
@@ -36,11 +42,16 @@ public class NotificationWriteRepository {
     public record UpcomingDose(long scheduledDoseId, long patientId) {
     }
 
+    /** 마지막 복용일이 다가오는 처방 (복용 종료 예정 알림 대상) */
+    public record EndingPrescription(long prescriptionId, long patientId) {
+    }
+
     private static final String INSERT_COLUMNS = "INSERT INTO notification (patient_id, recipient_user_id, notif_type, "
-            + "android_channel, title, body, scheduled_dose_id, intake_event_id, mapping_id, device_id) ";
+            + "android_channel, title, body, scheduled_dose_id, intake_event_id, mapping_id, device_id, prescription_id) ";
     /** 비어 있을 수 있는 번호는 형을 명시해서, 값이 null이어도 DB가 형을 정할 수 있게 한다 */
     private static final String SELECT_VALUES = "SELECT CAST(:patientId AS BIGINT), %s, :type, :channel, :title, :body, "
-            + "CAST(:doseId AS BIGINT), CAST(:intakeId AS BIGINT), CAST(:mappingId AS BIGINT), CAST(:deviceId AS BIGINT) ";
+            + "CAST(:doseId AS BIGINT), CAST(:intakeId AS BIGINT), CAST(:mappingId AS BIGINT), CAST(:deviceId AS BIGINT), "
+            + "CAST(:prescriptionId AS BIGINT) ";
 
     private final NamedParameterJdbcTemplate jdbc;
 
@@ -54,7 +65,7 @@ public class NotificationWriteRepository {
         String recipient = "g.guardian_user_id";
         String sql = INSERT_COLUMNS + String.format(SELECT_VALUES, recipient)
                 + "FROM guardian_link g WHERE g.patient_id = :patientId AND g.status = 'ACTIVE' "
-                + settingClause(recipient, settingKey) + dedupeClause(recipient, links, dedupe);
+                + settingClause(recipient, settingKey) + dedupeClause(recipient, links, dedupe) + conflictClause(links);
         return jdbc.update(sql, params(patientId, kind, settingKey, links));
     }
 
@@ -64,7 +75,7 @@ public class NotificationWriteRepository {
         String recipient = "p.user_id";
         String sql = INSERT_COLUMNS + String.format(SELECT_VALUES, recipient)
                 + "FROM patient p WHERE p.patient_id = :patientId AND p.user_id IS NOT NULL "
-                + settingClause(recipient, settingKey) + dedupeClause(recipient, links, dedupe);
+                + settingClause(recipient, settingKey) + dedupeClause(recipient, links, dedupe) + conflictClause(links);
         return jdbc.update(sql, params(patientId, kind, settingKey, links));
     }
 
@@ -93,6 +104,22 @@ public class NotificationWriteRepository {
                 (rs, n) -> new UpcomingDose(rs.getLong("scheduled_dose_id"), rs.getLong("patient_id")));
     }
 
+    /**
+     * 마지막 복용일이 [today, until] 사이로 다가온 처방을 읽는다. 복용 종료 예정 알림 대상이다.
+     *  - 삭제했거나 복용을 종료한 약, 필요 시 복용 약은 마지막 복용일 계산에서 빼고, 종료된 처방은 대상이 아니다.
+     *  - 가장 이른 시작일이 오늘보다 앞인 처방만(오늘 막 시작한 짧은 처방에는 알리지 않는다).
+     */
+    public List<EndingPrescription> findEndingPrescriptions(LocalDate today, LocalDate until, int limit) {
+        return jdbc.query("SELECT pm.prescription_id, pm.patient_id FROM patient_medication pm "
+                        + "JOIN prescription p ON p.prescription_id = pm.prescription_id AND p.patient_id = pm.patient_id "
+                        + "WHERE pm.deleted_at IS NULL AND pm.ended_at IS NULL AND NOT pm.is_prn AND p.ended_at IS NULL "
+                        + "GROUP BY pm.prescription_id, pm.patient_id "
+                        + "HAVING MAX(pm.end_date) BETWEEN :today AND :until AND MIN(pm.start_date) < :today "
+                        + "ORDER BY MAX(pm.end_date), pm.prescription_id LIMIT :limit",
+                new MapSqlParameterSource().addValue("today", today).addValue("until", until).addValue("limit", limit),
+                (rs, n) -> new EndingPrescription(rs.getLong("prescription_id"), rs.getLong("patient_id")));
+    }
+
     /** 받는 사람이 이 알림 설정을 꺼 놨으면 제외한다 (설정 행이 없거나 켜짐이면 통과) */
     private static String settingClause(String recipient, NotificationSettingKey key) {
         if (key == null) {
@@ -118,6 +145,14 @@ public class NotificationWriteRepository {
         return "";
     }
 
+    /**
+     * 처방에 딸린 알림(복용 종료 예정)은 DB의 유일 인덱스(uq_notification_end_soon)가 같은 처방·같은 받는 사람의 중복을
+     * 막는다. 그 경우 오류 대신 건너뛰도록 한다.
+     */
+    private static String conflictClause(Links links) {
+        return links.prescriptionId() == null ? "" : " ON CONFLICT DO NOTHING";
+    }
+
     private static MapSqlParameterSource params(long patientId, NotificationKind kind, NotificationSettingKey settingKey,
                                                 Links links) {
         return new MapSqlParameterSource()
@@ -130,6 +165,7 @@ public class NotificationWriteRepository {
                 .addValue("doseId", links.scheduledDoseId())
                 .addValue("intakeId", links.intakeEventId())
                 .addValue("mappingId", links.mappingId())
-                .addValue("deviceId", links.deviceId());
+                .addValue("deviceId", links.deviceId())
+                .addValue("prescriptionId", links.prescriptionId());
     }
 }
