@@ -16,6 +16,8 @@ import org.springframework.stereotype.Service;
  *  복용 감지, 약통 열기만 함, 미복용  → 연동된 보호자 ("보호자 공유 알림" 설정 GUARDIAN_*)
  *  기기 이상                          → 연동된 보호자(GUARDIAN_DEVICE) + 복약자 본인(DEVICE)
  *  약이 얼마 안 남음                  → 복약자 본인 + 연동된 보호자 (끄는 설정 없음)
+ *  복용 시간 알림(예정 10분 전)       → 복약자 본인 (DOSE_REMINDER)
+ *  미복용 알림(예정 30분 후, 본인용)   → 복약자 본인 (MISSED)
  */
 @Service
 @RequiredArgsConstructor
@@ -39,6 +41,18 @@ public class NotificationCreator {
     public int onMissedDose(long patientId, long scheduledDoseId) {
         return notificationWriteRepository.insertForGuardians(patientId, NotificationKind.MISSED_DOSE,
                 NotificationSettingKey.GUARDIAN_MISSED, new Links(scheduledDoseId, null, null, null), true);
+    }
+
+    /** 예정 시각이 10분 뒤로 다가왔다 (같은 예정에는 한 번만) */
+    public int onDoseReminder(long patientId, long scheduledDoseId) {
+        return notificationWriteRepository.insertForPatient(patientId, NotificationKind.DOSE_REMINDER,
+                NotificationSettingKey.DOSE_REMINDER, new Links(scheduledDoseId, null, null, null), true);
+    }
+
+    /** 예정 시각에서 30분이 지났는데 복용이 없다: 복약자 본인에게 다시 알린다 (같은 예정에는 한 번만) */
+    public int onSelfMissedDose(long patientId, long scheduledDoseId) {
+        return notificationWriteRepository.insertForPatient(patientId, NotificationKind.MISSED_DOSE_SELF,
+                NotificationSettingKey.MISSED, new Links(scheduledDoseId, null, null, null), true);
     }
 
     /** 약통에 이상이 생겼다 (정상에서 이상으로 바뀌는 순간에만 호출된다) */

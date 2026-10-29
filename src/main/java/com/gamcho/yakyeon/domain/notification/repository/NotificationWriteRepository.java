@@ -32,6 +32,10 @@ public class NotificationWriteRepository {
     public record OverdueDose(long scheduledDoseId, long patientId) {
     }
 
+    /** 곧 복용할 시간이 되는 예정 (복용 시간 알림 대상) */
+    public record UpcomingDose(long scheduledDoseId, long patientId) {
+    }
+
     private static final String INSERT_COLUMNS = "INSERT INTO notification (patient_id, recipient_user_id, notif_type, "
             + "android_channel, title, body, scheduled_dose_id, intake_event_id, mapping_id, device_id) ";
     /** 비어 있을 수 있는 번호는 형을 명시해서, 값이 null이어도 DB가 형을 정할 수 있게 한다 */
@@ -77,6 +81,18 @@ public class NotificationWriteRepository {
                 (rs, n) -> new OverdueDose(rs.getLong("scheduled_dose_id"), rs.getLong("patient_id")));
     }
 
+    /**
+     * 곧 복용할 시간이 되는 예정(지금 이후 ~ until 사이에 시작하고 판정 전)을 읽는다. 복용 시간 알림 대상이다.
+     * 잠금 방식은 lockOverdueDoses와 같다. close_at 조건은 항상 참이지만 PENDING 전용 인덱스를 쓰게 하려고 넣었다.
+     */
+    public List<UpcomingDose> lockUpcomingDoses(OffsetDateTime now, OffsetDateTime until, int limit) {
+        return jdbc.query("SELECT scheduled_dose_id, patient_id FROM scheduled_dose "
+                        + "WHERE status = 'PENDING' AND scheduled_at > :now AND scheduled_at <= :until AND close_at > :now "
+                        + "ORDER BY scheduled_at, scheduled_dose_id LIMIT :limit FOR UPDATE SKIP LOCKED",
+                new MapSqlParameterSource().addValue("now", now).addValue("until", until).addValue("limit", limit),
+                (rs, n) -> new UpcomingDose(rs.getLong("scheduled_dose_id"), rs.getLong("patient_id")));
+    }
+
     /** 받는 사람이 이 알림 설정을 꺼 놨으면 제외한다 (설정 행이 없거나 켜짐이면 통과) */
     private static String settingClause(String recipient, NotificationSettingKey key) {
         if (key == null) {
@@ -106,7 +122,7 @@ public class NotificationWriteRepository {
                                                 Links links) {
         return new MapSqlParameterSource()
                 .addValue("patientId", patientId)
-                .addValue("type", kind.name())
+                .addValue("type", kind.type())
                 .addValue("channel", kind.channel())
                 .addValue("title", kind.title())
                 .addValue("body", kind.body())
