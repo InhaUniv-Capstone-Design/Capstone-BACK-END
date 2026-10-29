@@ -26,11 +26,17 @@ import java.util.List;
 public class NotificationWriteRepository {
 
     /** 앱이 알림을 눌렀을 때 이동할 화면을 정하는 데 쓰는 관련 번호들 (없으면 null) */
-    public record Links(Long scheduledDoseId, Long intakeEventId, Long mappingId, Long deviceId, Long prescriptionId) {
+    public record Links(Long scheduledDoseId, Long intakeEventId, Long mappingId, Long deviceId, Long prescriptionId,
+                        Long checkId) {
 
-        /** 처방과 관계없는 알림(대부분)은 처방 번호 없이 만든다 */
+        /** 처방·병용금기 검사와 관계없는 알림(대부분)은 그 번호 없이 만든다 */
         public Links(Long scheduledDoseId, Long intakeEventId, Long mappingId, Long deviceId) {
-            this(scheduledDoseId, intakeEventId, mappingId, deviceId, null);
+            this(scheduledDoseId, intakeEventId, mappingId, deviceId, null, null);
+        }
+
+        /** 처방에 딸린 알림(복용 종료 예정) */
+        public Links(Long scheduledDoseId, Long intakeEventId, Long mappingId, Long deviceId, Long prescriptionId) {
+            this(scheduledDoseId, intakeEventId, mappingId, deviceId, prescriptionId, null);
         }
     }
 
@@ -47,11 +53,11 @@ public class NotificationWriteRepository {
     }
 
     private static final String INSERT_COLUMNS = "INSERT INTO notification (patient_id, recipient_user_id, notif_type, "
-            + "android_channel, title, body, scheduled_dose_id, intake_event_id, mapping_id, device_id, prescription_id) ";
+            + "android_channel, title, body, scheduled_dose_id, intake_event_id, mapping_id, device_id, prescription_id, check_id) ";
     /** 비어 있을 수 있는 번호는 형을 명시해서, 값이 null이어도 DB가 형을 정할 수 있게 한다 */
     private static final String SELECT_VALUES = "SELECT CAST(:patientId AS BIGINT), %s, :type, :channel, :title, :body, "
             + "CAST(:doseId AS BIGINT), CAST(:intakeId AS BIGINT), CAST(:mappingId AS BIGINT), CAST(:deviceId AS BIGINT), "
-            + "CAST(:prescriptionId AS BIGINT) ";
+            + "CAST(:prescriptionId AS BIGINT), CAST(:checkId AS BIGINT) ";
 
     private final NamedParameterJdbcTemplate jdbc;
 
@@ -166,6 +172,7 @@ public class NotificationWriteRepository {
                 .addValue("intakeId", links.intakeEventId())
                 .addValue("mappingId", links.mappingId())
                 .addValue("deviceId", links.deviceId())
-                .addValue("prescriptionId", links.prescriptionId());
+                .addValue("prescriptionId", links.prescriptionId())
+                .addValue("checkId", links.checkId());
     }
 }
