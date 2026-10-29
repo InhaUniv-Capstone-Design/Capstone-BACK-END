@@ -1,5 +1,6 @@
 package com.gamcho.yakyeon.domain.account.controller;
 
+import com.gamcho.yakyeon.common.feature.LegacyConsentOnly;
 import com.gamcho.yakyeon.domain.account.dto.ConsentRequest;
 import com.gamcho.yakyeon.domain.account.dto.ConsentResponse;
 import com.gamcho.yakyeon.domain.account.dto.GuardianLinkResponse;
@@ -42,6 +43,7 @@ public class GuardianLinkController {
     private final GuardianLinkService guardianLinkService;
     private final VerificationService verificationService;
 
+    @LegacyConsentOnly
     @GetMapping("/patients/search")
     public ResponseEntity<List<PatientSearchResponse>> searchPatients(
             @AuthenticationPrincipal Long userId,
@@ -49,6 +51,7 @@ public class GuardianLinkController {
         return ResponseEntity.ok(guardianLinkService.searchPatients(userId, phone));
     }
 
+    @LegacyConsentOnly
     @PostMapping("/patients/{patientId}/guardian-links")
     public ResponseEntity<GuardianLinkResponse> createLink(
             @AuthenticationPrincipal Long userId,
@@ -57,6 +60,7 @@ public class GuardianLinkController {
     }
 
     /** 요청 바디는 만 14세 미만(법정대리인 번호 필요)일 때만 필요하다 */
+    @LegacyConsentOnly
     @PostMapping("/guardian-links/{linkId}/verification")
     public ResponseEntity<VerificationSendResponse> sendVerification(
             @AuthenticationPrincipal Long userId,
@@ -65,6 +69,7 @@ public class GuardianLinkController {
         return ResponseEntity.ok(verificationService.send(userId, linkId, request));
     }
 
+    @LegacyConsentOnly
     @PostMapping("/verifications/{verificationId}/confirm")
     public ResponseEntity<VerificationConfirmResponse> confirmVerification(
             @AuthenticationPrincipal Long userId,
@@ -74,6 +79,7 @@ public class GuardianLinkController {
         return ResponseEntity.ok(new VerificationConfirmResponse(verified));
     }
 
+    @LegacyConsentOnly
     @PostMapping("/guardian-links/{linkId}/consent")
     public ResponseEntity<ConsentResponse> consent(
             @AuthenticationPrincipal Long userId,

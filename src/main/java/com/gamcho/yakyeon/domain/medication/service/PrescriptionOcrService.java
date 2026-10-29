@@ -28,7 +28,7 @@ import java.util.Locale;
 @RequiredArgsConstructor
 public class PrescriptionOcrService {
 
-    private static final long MAX_IMAGE_BYTES = 10L * 1024 * 1024;
+    private static final long MAX_IMAGE_BYTES = 8L * 1024 * 1024;
     private static final int CANDIDATE_LIMIT = 3;
     private static final int MAX_LOOKUP_LENGTH = 50;
 

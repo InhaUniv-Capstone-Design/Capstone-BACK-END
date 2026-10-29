@@ -3,6 +3,7 @@ package com.gamcho.yakyeon.domain.account.service;
 import com.gamcho.yakyeon.common.exception.BusinessException;
 import com.gamcho.yakyeon.common.exception.ErrorCode;
 import com.gamcho.yakyeon.common.util.PhoneNumbers;
+import com.gamcho.yakyeon.common.validation.InputRules;
 import com.gamcho.yakyeon.domain.account.dto.AccountDeleteRequest;
 import com.gamcho.yakyeon.domain.account.dto.AgreementItem;
 import com.gamcho.yakyeon.domain.account.dto.LoginRequest;
@@ -153,8 +154,9 @@ public class AuthService {
     /** FR-AUTH-002: 아이디 중복 검사 (활성 계정 기준) */
     @Transactional(readOnly = true)
     public boolean isLoginIdAvailable(String loginId) {
-        // '#'로 시작하는 아이디는 탈퇴 계정용으로 예약돼 있어 가입할 수 없다 (DB CHECK 제약)
-        if (loginId.startsWith("#")) {
+        // 가입 규칙(6~20자 영문·숫자)에 맞지 않는 아이디는 쓸 수 없다.
+        // '#'로 시작하는 아이디(탈퇴 계정용으로 예약, DB CHECK 제약)도 이 규칙에서 걸러진다.
+        if (!InputRules.isValidLoginId(loginId)) {
             return false;
         }
         return !appUserRepository.existsByLoginIdAndDeletedAtIsNull(loginId);

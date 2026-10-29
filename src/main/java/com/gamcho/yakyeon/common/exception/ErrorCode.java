@@ -40,6 +40,8 @@ public enum ErrorCode {
     GUARDIAN_LINK_NOT_ACTIVE(HttpStatus.CONFLICT, "연동 중인 상태가 아닙니다."),
     PERMISSION_UPGRADE_FORBIDDEN(HttpStatus.FORBIDDEN, "권한 범위를 넓히는 것은 복약자 본인만 할 수 있습니다."),
     INSUFFICIENT_PERMISSION(HttpStatus.FORBIDDEN, "이 복약자의 데이터에 대해 해당 작업을 할 권한이 없습니다."),
+    /** 설정(features.*)으로 꺼 둔 기능. 없는 주소처럼 보이게 404로 응답한다 */
+    FEATURE_DISABLED(HttpStatus.NOT_FOUND, "사용할 수 없는 기능입니다."),
 
     // --- 약물 검색 ---
     INVALID_SEARCH_QUERY(HttpStatus.BAD_REQUEST, "검색어가 너무 깁니다. 50자 이하로 입력해주세요."),
@@ -52,7 +54,7 @@ public enum ErrorCode {
     // --- 처방전 이미지 ---
     INVALID_IMAGE(HttpStatus.BAD_REQUEST, "올바른 이미지 파일이 아닙니다. JPEG 또는 PNG 이미지를 올려주세요."),
     /** 413. 스프링 버전에 따라 상수 이름이 다르므로(PAYLOAD_TOO_LARGE / CONTENT_TOO_LARGE) 숫자로 만든다 */
-    IMAGE_TOO_LARGE(HttpStatus.valueOf(413), "이미지가 너무 큽니다. 10MB 이하로 올려주세요."),
+    IMAGE_TOO_LARGE(HttpStatus.valueOf(413), "이미지가 너무 큽니다. 8MB 이하로 올려주세요."),
     /** 약 항목의 값이 규칙에 맞지 않음. 어느 약의 어떤 필드인지는 상황별 메시지로 알려준다 */
     INVALID_MEDICATION(HttpStatus.BAD_REQUEST, "약물 정보가 올바르지 않습니다."),
 
