@@ -10,14 +10,12 @@ spring:
   jpa:
     hibernate:
       ddl-auto: validate
-    show-sql: true
-    properties:
-      hibernate:
-        format_sql: true
+    show-sql: false
   servlet:
     multipart:
-      max-file-size: 10MB
-      max-request-size: 11MB
+      # API Gateway(HTTP API)의 요청 본문 한도가 10MB라서, 그보다 작게 둬서 우리 서버가 먼저 JSON 오류로 거절하게 한다
+      max-file-size: 8MB
+      max-request-size: 9MB
 
 jwt:
   secret: ${JWT_SECRET}
@@ -29,7 +27,3 @@ encryption:
 
 server:
   port: 8080
-
-logging:
-  level:
-    org.springframework.security: DEBUG

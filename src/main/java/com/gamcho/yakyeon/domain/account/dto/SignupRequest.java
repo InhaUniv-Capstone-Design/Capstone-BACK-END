@@ -1,6 +1,7 @@
 package com.gamcho.yakyeon.domain.account.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.gamcho.yakyeon.common.validation.InputRules;
 import com.gamcho.yakyeon.domain.account.entity.AppUser;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -31,14 +32,13 @@ public class SignupRequest {
 
     @JsonProperty("login_id")
     @NotBlank(message = "아이디를 입력해주세요.")
-    @Size(min = 4, max = 30, message = "아이디는 4~30자여야 합니다.")
     // 팀 DB는 '#'로 시작하는 아이디를 탈퇴 계정용으로 예약해 둔다 (CHECK 제약) - 가입 단계에서 미리 막는다
-    @Pattern(regexp = "^[^#].*$", message = "아이디는 #으로 시작할 수 없습니다.")
+    @Pattern(regexp = InputRules.LOGIN_ID_REGEX, message = InputRules.LOGIN_ID_MESSAGE)
     private String loginId;
 
     @JsonProperty("password")
     @NotBlank(message = "비밀번호를 입력해주세요.")
-    @Size(min = 8, max = 64, message = "비밀번호는 8~64자여야 합니다.")
+    @Pattern(regexp = InputRules.PASSWORD_REGEX, message = InputRules.PASSWORD_MESSAGE)
     private String password;
 
     @JsonProperty("password_confirm")

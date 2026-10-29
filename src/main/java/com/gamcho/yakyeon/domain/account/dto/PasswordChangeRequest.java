@@ -1,8 +1,9 @@
 package com.gamcho.yakyeon.domain.account.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.gamcho.yakyeon.common.validation.InputRules;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.Pattern;
 import lombok.Getter;
 
 /**
@@ -17,7 +18,7 @@ public class PasswordChangeRequest {
 
     @JsonProperty("new_password")
     @NotBlank(message = "새 비밀번호를 입력해주세요.")
-    @Size(min = 8, max = 64, message = "비밀번호는 8~64자여야 합니다.")
+    @Pattern(regexp = InputRules.PASSWORD_REGEX, message = InputRules.PASSWORD_MESSAGE)
     private String newPassword;
 
     @JsonProperty("new_password_confirm")
