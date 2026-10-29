@@ -8,8 +8,12 @@ import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+
+import java.util.List;
 
 /**
  * 공개 엔드포인트(signup/check-id/login/refresh/logout, 가입용 문자 인증, GET /terms, POST /revocations/*)만 permitAll, 나머지는 인증 필요.
@@ -55,5 +59,14 @@ public class SecurityConfig {
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
+    }
+
+    /**
+     * 비어 있는 사용자 저장소. 로그인은 JWT로만 하는데, 이 빈이 없으면 스프링 부트가 기본 계정(user)과
+     * 임시 비밀번호를 만들어 서버를 켤 때마다 로그에 찍는다. 쓰이지 않는 계정을 아예 만들지 않으려고 직접 정의한다.
+     */
+    @Bean
+    public UserDetailsService emptyUserDetailsService() {
+        return new InMemoryUserDetailsManager(List.of());
     }
 }

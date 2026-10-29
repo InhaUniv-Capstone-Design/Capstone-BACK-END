@@ -40,6 +40,8 @@ public enum ErrorCode {
     GUARDIAN_LINK_NOT_ACTIVE(HttpStatus.CONFLICT, "연동 중인 상태가 아닙니다."),
     PERMISSION_UPGRADE_FORBIDDEN(HttpStatus.FORBIDDEN, "권한 범위를 넓히는 것은 복약자 본인만 할 수 있습니다."),
     INSUFFICIENT_PERMISSION(HttpStatus.FORBIDDEN, "이 복약자의 데이터에 대해 해당 작업을 할 권한이 없습니다."),
+    /** 설정(features.*)으로 꺼 둔 기능. 없는 주소처럼 보이게 404로 응답한다 */
+    FEATURE_DISABLED(HttpStatus.NOT_FOUND, "사용할 수 없는 기능입니다."),
 
     // --- 약물 검색 ---
     INVALID_SEARCH_QUERY(HttpStatus.BAD_REQUEST, "검색어가 너무 깁니다. 50자 이하로 입력해주세요."),

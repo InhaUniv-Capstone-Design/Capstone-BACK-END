@@ -1,5 +1,6 @@
 package com.gamcho.yakyeon.domain.account.controller;
 
+import com.gamcho.yakyeon.common.feature.LegacyConsentOnly;
 import com.gamcho.yakyeon.domain.account.dto.RevocationConfirmRequest;
 import com.gamcho.yakyeon.domain.account.dto.RevocationConfirmResponse;
 import com.gamcho.yakyeon.domain.account.dto.RevocationRequestBody;
@@ -18,6 +19,7 @@ import org.springframework.web.bind.annotation.RestController;
  * 로그인할 수 없는 사람이 쓰는 API라서 SecurityConfig에서 인증 없이 열려 있다.
  * (그만큼 응답으로 회원 여부가 드러나지 않게 RevocationService에서 막아둔 상태)
  */
+@LegacyConsentOnly
 @RestController
 @RequestMapping("/revocations")
 @RequiredArgsConstructor

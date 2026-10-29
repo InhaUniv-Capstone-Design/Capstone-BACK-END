@@ -2,6 +2,7 @@ package com.gamcho.yakyeon.domain.account.service;
 
 import com.gamcho.yakyeon.common.exception.BusinessException;
 import com.gamcho.yakyeon.common.exception.ErrorCode;
+import com.gamcho.yakyeon.common.feature.LegacyConsentFeature;
 import com.gamcho.yakyeon.domain.account.dto.PatientRegisterRequest;
 import com.gamcho.yakyeon.domain.account.dto.PatientResponse;
 import com.gamcho.yakyeon.domain.account.entity.AppUser;
@@ -25,6 +26,7 @@ public class PatientService {
     private final GuardianLinkRepository guardianLinkRepository;
     private final PhoneEncryptor phoneEncryptor;
     private final PhoneHasher phoneHasher; // HMAC-SHA256(서버 키) - 번호 조회·중복 검사용 해시
+    private final LegacyConsentFeature legacyConsentFeature;
 
     /**
      * 복약자 등록.
@@ -70,6 +72,9 @@ public class PatientService {
 
     private PatientResponse registerDependent(AppUser guardian, PatientRegisterRequest request,
                                               byte[] phoneEnc, String phoneHash) {
+        // 보호자가 앱 계정 없는 복약자를 직접 등록하는 건 옛 방식이다. 복약자의 동의 없이 연동이 바로 켜지고,
+        // 정식 흐름(복약자 웹 QR 동의)과 맞지 않아서 설정(features.legacy-sms-consent)이 꺼져 있으면 막는다.
+        legacyConsentFeature.requireEnabled();
         Patient patient = Patient.builder()
                 .user(null)
                 .name(request.getName())
