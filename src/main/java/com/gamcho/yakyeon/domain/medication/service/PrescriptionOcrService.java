@@ -4,6 +4,7 @@ import com.gamcho.yakyeon.common.exception.BusinessException;
 import com.gamcho.yakyeon.common.exception.ErrorCode;
 import com.gamcho.yakyeon.domain.account.access.AccessAction;
 import com.gamcho.yakyeon.domain.account.access.PatientAccessGuard;
+import com.gamcho.yakyeon.domain.account.consent.ConsentGuard;
 import com.gamcho.yakyeon.domain.drug.dto.DrugSuggestionResponse;
 import com.gamcho.yakyeon.domain.drug.service.DrugService;
 import com.gamcho.yakyeon.domain.medication.dto.OcrRecognizeResponse;
@@ -33,6 +34,7 @@ public class PrescriptionOcrService {
     private static final int MAX_LOOKUP_LENGTH = 50;
 
     private final PatientAccessGuard patientAccessGuard;
+    private final ConsentGuard consentGuard;
     private final PrescriptionOcrClient ocrClient;
     private final DrugService drugService;
     private final TransactionTemplate transactionTemplate;
@@ -48,6 +50,8 @@ public class PrescriptionOcrService {
         // 가드가 먼저다: 권한 없는 사람에게는 이미지 검증 결과조차 알려주지 않는다
         transactionTemplate.executeWithoutResult(status ->
                 patientAccessGuard.check(userId, patientId, AccessAction.CREATE, "prescription_ocr", null));
+        // 처방전을 읽는 것도 약 등록 흐름이라 같은 동의(MEDICATION)가 필요하다
+        consentGuard.requireMedication(userId);
 
         byte[] bytes = readAndValidate(image);
         OcrResult result = ocrClient.recognize(bytes);

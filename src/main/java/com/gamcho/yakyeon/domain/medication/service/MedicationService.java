@@ -5,6 +5,7 @@ import com.gamcho.yakyeon.common.exception.ErrorCode;
 import com.gamcho.yakyeon.common.util.ApiTime;
 import com.gamcho.yakyeon.domain.account.access.AccessAction;
 import com.gamcho.yakyeon.domain.account.access.PatientAccessGuard;
+import com.gamcho.yakyeon.domain.account.consent.ConsentGuard;
 import com.gamcho.yakyeon.domain.dose.service.DoseScheduleService;
 import com.gamcho.yakyeon.domain.drug.entity.Drug;
 import com.gamcho.yakyeon.domain.interaction.entity.InteractionCheck;
@@ -41,6 +42,7 @@ public class MedicationService {
                     .thenComparing(MedicationResponse::medicationId);
 
     private final PatientAccessGuard patientAccessGuard;
+    private final ConsentGuard consentGuard;
     private final PatientMedicationRepository patientMedicationRepository;
     private final MedicationInputValidator medicationInputValidator;
     private final InteractionService interactionService;
@@ -76,6 +78,8 @@ public class MedicationService {
     public MedicationResponse update(Long userId, Long medicationId, MedicationItem item) {
         PatientMedication medication = findAlive(medicationId);
         authorize(userId, medication, AccessAction.UPDATE);
+        // 복약정보 동의(MEDICATION)를 철회하면 약 수정은 막는다(조회·삭제·종료는 가능)
+        consentGuard.requireMedication(userId);
 
         boolean newPrn = Boolean.TRUE.equals(item.getPrn());
         if (newPrn != medication.isPrn()) {

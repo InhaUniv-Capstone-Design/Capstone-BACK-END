@@ -1,5 +1,6 @@
 package com.gamcho.yakyeon.domain.account.controller;
 
+import com.gamcho.yakyeon.domain.account.consent.ConsentExempt;
 import com.gamcho.yakyeon.domain.account.dto.ProfileResponse;
 import com.gamcho.yakyeon.domain.account.dto.ProfileUpdateRequest;
 import com.gamcho.yakyeon.domain.account.service.ProfileService;
@@ -19,6 +20,7 @@ public class ProfileController {
 
     private final ProfileService profileService;
 
+    @ConsentExempt
     @GetMapping("/users/me/profile")
     public ResponseEntity<ProfileResponse> get(@AuthenticationPrincipal Long userId) {
         return ResponseEntity.ok(profileService.get(userId));

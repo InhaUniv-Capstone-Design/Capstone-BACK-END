@@ -55,6 +55,7 @@ public class TermsVersion {
     }
 
     public enum TermsType {
-        TOS, PRIVACY, PRIVACY_POLICY, SENSITIVE_HEALTH, SERVICE_NOTICE, DELEGATION, LEGAL_REP, DEVICE
+        // DB의 CHECK 제약(terms_version.terms_type)이 허용하는 값과 같아야 한다. 빠지면 그 종류의 약관은 조회되지 않는다
+        TOS, PRIVACY, PRIVACY_POLICY, SENSITIVE_HEALTH, SERVICE_NOTICE, DELEGATION, LEGAL_REP, DEVICE, MEDICATION
     }
 }

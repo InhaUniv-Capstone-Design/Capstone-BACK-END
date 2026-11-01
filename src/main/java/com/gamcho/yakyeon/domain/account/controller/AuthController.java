@@ -1,5 +1,6 @@
 package com.gamcho.yakyeon.domain.account.controller;
 
+import com.gamcho.yakyeon.domain.account.consent.ConsentExempt;
 import com.gamcho.yakyeon.domain.account.dto.AccountDeleteRequest;
 import com.gamcho.yakyeon.domain.account.dto.CheckIdResponse;
 import com.gamcho.yakyeon.domain.account.dto.LoginRequest;
@@ -70,12 +71,14 @@ public class AuthController {
     }
 
     /** FR-AUTH-006: Access Token 재발급 (Refresh Token 회전) */
+    @ConsentExempt
     @PostMapping("/refresh")
     public ResponseEntity<LoginResponse> refresh(@Valid @RequestBody RefreshRequest request) {
         return ResponseEntity.ok(authService.refresh(request));
     }
 
     /** FR-AUTH-006: 로그아웃 (해당 Refresh Token만 폐기) */
+    @ConsentExempt
     @PostMapping("/logout")
     public ResponseEntity<Void> logout(@Valid @RequestBody RefreshRequest request) {
         authService.logout(request);
@@ -92,6 +95,7 @@ public class AuthController {
     }
 
     /** 계정 삭제(탈퇴) - 로그인 필요, 비밀번호 재확인 */
+    @ConsentExempt
     @DeleteMapping("/account")
     public ResponseEntity<Void> deleteAccount(
             @AuthenticationPrincipal Long userId,

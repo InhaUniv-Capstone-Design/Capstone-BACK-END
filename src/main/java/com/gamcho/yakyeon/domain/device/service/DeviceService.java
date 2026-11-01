@@ -5,6 +5,7 @@ import com.gamcho.yakyeon.common.exception.ErrorCode;
 import com.gamcho.yakyeon.common.util.ApiTime;
 import com.gamcho.yakyeon.domain.account.access.AccessAction;
 import com.gamcho.yakyeon.domain.account.access.PatientAccessGuard;
+import com.gamcho.yakyeon.domain.account.consent.ConsentGuard;
 import com.gamcho.yakyeon.domain.device.dto.DeviceRegisterRequest;
 import com.gamcho.yakyeon.domain.device.dto.DeviceResponse;
 import com.gamcho.yakyeon.domain.device.entity.Device;
@@ -32,13 +33,15 @@ public class DeviceService {
     private static final short DEFAULT_MAX_COMPARTMENTS = 3;
 
     private final PatientAccessGuard patientAccessGuard;
+    private final ConsentGuard consentGuard;
     private final DeviceRepository deviceRepository;
     private final JdbcTemplate jdbcTemplate;
 
     @Transactional
     public DeviceResponse register(Long userId, Long patientId, DeviceRegisterRequest request) {
         patientAccessGuard.check(userId, patientId, AccessAction.UPDATE, RESOURCE_TYPE, null);
-        // 센서 이벤트 수집 동의 확인 자리: 동의 항목이 확정되면 여기서 동의하지 않은 복약자의 등록을 거절한다.
+        // 약통 등록 전 스마트 약통 연결 동의(DEVICE)가 있어야 한다. 요청한 사람 본인의 동의를 본다
+        consentGuard.requireDevice(userId);
 
         if (deviceRepository.existsByPatientIdAndStatus(patientId, DeviceStatus.REGISTERED)) {
             throw new BusinessException(ErrorCode.DEVICE_ALREADY_REGISTERED);
@@ -86,7 +89,22 @@ public class DeviceService {
         patientAccessGuard.check(userId, patientId, AccessAction.UPDATE, RESOURCE_TYPE, null);
         Device device = deviceRepository.findByPatientIdAndStatus(patientId, DeviceStatus.REGISTERED)
                 .orElseThrow(() -> new BusinessException(ErrorCode.DEVICE_NOT_FOUND));
+        release(device);
+    }
 
+    /**
+     * 약통 연결 동의(DEVICE)를 철회하면 본인(복약자 프로필)에게 연결된 약통을 해제한다.
+     * 사람이 약통 해제를 요청한 것이 아니라 동의 철회의 결과라서 접근 권한 확인은 하지 않는다. 연결된 약통이 없으면 아무 일도 없다.
+     */
+    @Transactional
+    public void releaseOwnDevice(Long userId) {
+        for (Long patientId : jdbcTemplate.queryForList("SELECT patient_id FROM patient WHERE user_id = ?", Long.class, userId)) {
+            deviceRepository.findByPatientIdAndStatus(patientId, DeviceStatus.REGISTERED).ifPresent(this::release);
+        }
+    }
+
+    /** 칸 배정을 모두 끝내고 약통 등록을 해제한다 */
+    private void release(Device device) {
         OffsetDateTime now = OffsetDateTime.now(ApiTime.SERVICE_ZONE);
         jdbcTemplate.update("UPDATE compartment_mapping SET status = 'ENDED', valid_to = ?, "
                         + "valid_from = coalesce(valid_from, ?), loaded_count = coalesce(loaded_count, 0) "

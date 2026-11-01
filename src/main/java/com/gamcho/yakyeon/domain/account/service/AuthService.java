@@ -16,6 +16,7 @@ import com.gamcho.yakyeon.domain.account.entity.AuthToken;
 import com.gamcho.yakyeon.domain.account.entity.Patient;
 import com.gamcho.yakyeon.domain.account.entity.TermsVersion;
 import com.gamcho.yakyeon.domain.account.entity.UserAgreement;
+import com.gamcho.yakyeon.domain.account.consent.AgreementRepository;
 import com.gamcho.yakyeon.domain.account.repository.AppUserRepository;
 import com.gamcho.yakyeon.domain.account.repository.AuthTokenRepository;
 import com.gamcho.yakyeon.domain.account.repository.PatientRepository;
@@ -56,6 +57,7 @@ public class AuthService {
     private final AppUserRepository appUserRepository;
     private final TermsVersionRepository termsVersionRepository;
     private final UserAgreementRepository userAgreementRepository;
+    private final AgreementRepository agreementRepository;
     private final AuthTokenRepository authTokenRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
@@ -135,6 +137,11 @@ public class AuthService {
                         .build())
                 .toList();
         userAgreementRepository.saveAll(agreements);
+        // 동의 이력(agreement_log)은 DB가 자동으로 남기지 않아서 서버가 직접 남긴다
+        agreementRepository.logAgree(savedUser.getUserId(), agreementPlan.stream()
+                .filter(AgreementPlan::agreed)
+                .map(plan -> plan.termsVersion().getTermsVersionId())
+                .toList());
 
         return savedUser.getUserId();
     }
