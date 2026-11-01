@@ -4,6 +4,7 @@ import com.gamcho.yakyeon.common.util.ApiTime;
 import com.gamcho.yakyeon.domain.account.access.AccessAction;
 import com.gamcho.yakyeon.domain.account.access.PatientAccess;
 import com.gamcho.yakyeon.domain.account.access.PatientAccessGuard;
+import com.gamcho.yakyeon.domain.account.consent.ConsentGuard;
 import com.gamcho.yakyeon.domain.account.entity.AppUser;
 import com.gamcho.yakyeon.domain.account.repository.AppUserRepository;
 import com.gamcho.yakyeon.domain.drug.entity.Drug;
@@ -30,6 +31,7 @@ import java.util.Map;
 public class PrescriptionService {
 
     private final PatientAccessGuard patientAccessGuard;
+    private final ConsentGuard consentGuard;
     private final AppUserRepository appUserRepository;
     private final MedicationInputValidator medicationInputValidator;
     private final PrescriptionRepository prescriptionRepository;
@@ -48,6 +50,8 @@ public class PrescriptionService {
         // 가드가 먼저다: 권한 없는 사람에게 입력 검증 결과(어떤 약이 DB에 있는지 등)를 알려주지 않는다
         PatientAccess access = patientAccessGuard.check(
                 userId, patientId, AccessAction.CREATE, "prescription", null);
+        // 약 등록 전 복약정보 수집·이용 동의(MEDICATION)가 있어야 한다. 요청한 사람 본인의 동의를 본다
+        consentGuard.requireMedication(userId);
 
         List<MedicationItem> items = request.getMedications();
         Map<Long, Drug> drugs = medicationInputValidator.loadDrugs(items);

@@ -42,6 +42,10 @@ public enum ErrorCode {
     INSUFFICIENT_PERMISSION(HttpStatus.FORBIDDEN, "이 복약자의 데이터에 대해 해당 작업을 할 권한이 없습니다."),
     /** 설정(features.*)으로 꺼 둔 기능. 없는 주소처럼 보이게 404로 응답한다 */
     FEATURE_DISABLED(HttpStatus.NOT_FOUND, "사용할 수 없는 기능입니다."),
+    /** 약 등록 전 복약정보 동의, 약통 등록 전 약통 연결 동의, 또는 필수 동의(이용약관·개인정보·건강정보) 철회 */
+    CONSENT_REQUIRED(HttpStatus.FORBIDDEN, "필요한 동의가 없습니다. 동의한 뒤 다시 시도해주세요."),
+    TERMS_VERSION_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 약관 버전입니다."),
+    TERMS_TYPE_NOT_SUPPORTED(HttpStatus.BAD_REQUEST, "이 약관은 이 기능으로 동의하거나 철회할 수 없습니다."),
 
     // --- 약물 검색 ---
     INVALID_SEARCH_QUERY(HttpStatus.BAD_REQUEST, "검색어가 너무 깁니다. 50자 이하로 입력해주세요."),
