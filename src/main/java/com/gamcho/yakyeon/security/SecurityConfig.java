@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -33,6 +34,9 @@ public class SecurityConfig {
         http
                 .csrf(AbstractHttpConfigurer::disable)
                 // JWT는 헤더로 전달되고 세션 쿠키를 쓰지 않으므로 CSRF 보호 대상이 아님(REST API 표준 관행)
+                // 복약자 권한 관리 웹(브라우저)이 다른 주소에서 호출할 수 있게 CORS를 켠다. 허용 주소는 CorsConfig에서 정한다.
+                // 사전 요청(OPTIONS)은 이 설정이 로그인 확인보다 먼저 처리하므로 OPTIONS를 따로 열어 주지 않는다
+                .cors(Customizer.withDefaults())
                 .httpBasic(AbstractHttpConfigurer::disable)
                 .formLogin(AbstractHttpConfigurer::disable)
                 // 세션을 만들지 않는다 - 모든 인증 상태는 매 요청의 Access Token으로만 판단(무상태)
