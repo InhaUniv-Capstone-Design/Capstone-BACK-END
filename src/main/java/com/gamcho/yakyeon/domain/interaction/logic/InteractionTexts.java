@@ -6,6 +6,10 @@ public final class InteractionTexts {
     /** 모든 병용금기 상세에 붙는 면책 문구 (진단이 아니라는 점과 의료진 상담) */
     public static final String DISCLAIMER = "본 정보는 진단이 아니며 최종 판단은 의료진과 상담하세요.";
 
+    /** 복약 이력 공유 요약(의료진에게 보여 주는 화면) 맨 아래 면책 문구. 법률 검토 대상 */
+    public static final String SHARE_DISCLAIMER =
+            "앱에 기록된 복약 정보입니다. 등재 정보는 진단이 아니며, 처방 변경 전 의료진 확인이 필요합니다.";
+
     /** 병용 시 주의사항 */
     public static final String PRECAUTION = "복용 중인 조합을 임의로 바꾸지 말고 의료진과 상담하세요.";
 

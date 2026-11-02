@@ -8,6 +8,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.BiPredicate;
 
 /**
  * 복약자의 약 목록과 DUR에서 찾은 제품 쌍을 맞춰서 병용금기 목록을 만든다 (DB·스프링 없는 순수 로직).
@@ -28,12 +29,19 @@ public final class InteractionMatcher {
         return !a.startDate().isAfter(b.endDate()) && !b.startDate().isAfter(a.endDate());
     }
 
+    /** 오늘 기준으로 병용금기를 찾는다: 이미 끝난 약이 낀 쌍과 복용 기간이 겹치지 않는 쌍은 뺀다 */
+    public static List<Finding> match(List<MedicationRef> meds, List<FoundPair> pairs, LocalDate today) {
+        return match(meds, pairs, (a, b) -> isRelevantPair(a, b, today));
+    }
+
     /**
      * @param meds  검사 대상 약 (끝난 약은 호출하는 쪽에서 이미 뺀 목록)
      * @param pairs DUR에서 찾은 제품 쌍 (복약자의 약 품목코드 안에서만 찾은 결과)
+     * @param relevant 두 약의 쌍을 결과에 넣을지 정하는 기준. 지금 복용 중인 약은 isRelevantPair, 지난 복용 이력은 호출하는 쪽이 정한다
      * @return 약 번호 쌍(작은 번호가 A)과 DUR 번호 순으로 정렬한 병용금기 목록
      */
-    public static List<Finding> match(List<MedicationRef> meds, List<FoundPair> pairs, LocalDate today) {
+    public static List<Finding> match(List<MedicationRef> meds, List<FoundPair> pairs,
+                                      BiPredicate<MedicationRef, MedicationRef> relevant) {
         Map<String, List<MedicationRef>> byItemSeq = new LinkedHashMap<>();
         for (MedicationRef m : meds) {
             if (m.checkable()) {
@@ -46,7 +54,7 @@ public final class InteractionMatcher {
         for (FoundPair p : pairs) {
             for (MedicationRef ma : byItemSeq.getOrDefault(p.itemSeqA(), List.of())) {
                 for (MedicationRef mb : byItemSeq.getOrDefault(p.itemSeqB(), List.of())) {
-                    if (ma.medicationId() == mb.medicationId() || !isRelevantPair(ma, mb, today)) {
+                    if (ma.medicationId() == mb.medicationId() || !relevant.test(ma, mb)) {
                         continue;
                     }
                     // 약 번호가 작은 쪽을 A로 맞춘다. 성분 코드도 약과 같이 바꿔야 약-성분 짝이 유지된다.
