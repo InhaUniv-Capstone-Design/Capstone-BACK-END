@@ -8,6 +8,7 @@ import com.gamcho.yakyeon.domain.account.access.PatientAccessGuard;
 import com.gamcho.yakyeon.domain.account.consent.ConsentGuard;
 import com.gamcho.yakyeon.domain.device.dto.DeviceRegisterRequest;
 import com.gamcho.yakyeon.domain.device.dto.DeviceResponse;
+import com.gamcho.yakyeon.domain.device.dto.DeviceSettingsRequest;
 import com.gamcho.yakyeon.domain.device.entity.Device;
 import com.gamcho.yakyeon.domain.device.entity.DeviceStatus;
 import com.gamcho.yakyeon.domain.device.logic.DeviceSecrets;
@@ -75,6 +76,26 @@ public class DeviceService {
     @Transactional(readOnly = true)
     public DeviceResponse get(Long userId, Long patientId) {
         patientAccessGuard.check(userId, patientId, AccessAction.VIEW, RESOURCE_TYPE, null);
+        return DeviceResponse.from(deviceRepository.findByPatientIdAndStatus(patientId, DeviceStatus.REGISTERED)
+                .orElseThrow(() -> new BusinessException(ErrorCode.DEVICE_NOT_FOUND)));
+    }
+
+    /**
+     * 부저·LED 알림 설정을 바꾼다. 보낸 항목만 바뀌고 보내지 않은 항목은 그대로다. 중계 서버가 이 값을 읽어 약통에 전달한다.
+     * 중계 서버가 같은 행의 다른 컬럼(접속 여부, 일정 반영 버전 등)도 쓰고 있어서, 엔티티를 통째로 저장하지 않고
+     * 두 컬럼만 바꾸는 SQL 한 문장으로 처리한다(중계 서버의 갱신을 옛 값으로 덮어쓰지 않으려는 것이다).
+     */
+    @Transactional
+    public DeviceResponse updateSettings(Long userId, Long patientId, DeviceSettingsRequest request) {
+        patientAccessGuard.check(userId, patientId, AccessAction.UPDATE, RESOURCE_TYPE, null);
+        int updated = jdbcTemplate.update(
+                "UPDATE device SET buzzer_enabled = COALESCE(CAST(? AS BOOLEAN), buzzer_enabled), "
+                        + "led_enabled = COALESCE(CAST(? AS BOOLEAN), led_enabled) "
+                        + "WHERE patient_id = ? AND status = 'REGISTERED'",
+                request.getBuzzerEnabled(), request.getLedEnabled(), patientId);
+        if (updated == 0) {
+            throw new BusinessException(ErrorCode.DEVICE_NOT_FOUND);
+        }
         return DeviceResponse.from(deviceRepository.findByPatientIdAndStatus(patientId, DeviceStatus.REGISTERED)
                 .orElseThrow(() -> new BusinessException(ErrorCode.DEVICE_NOT_FOUND)));
     }
