@@ -36,6 +36,11 @@ public class DeviceSignalRepository {
     public record IrRow(long signalId, OffsetDateTime occurredAt) {
     }
 
+    /** 이미 저장된 신호 한 건 (약통이 직접 보냈거나, 중계 서버가 DB에 저장한 것) */
+    public record StoredSignal(long signalId, long deviceId, String signalType, int compartmentNo,
+                               OffsetDateTime occurredAt) {
+    }
+
     /** 이 칸의 쓰는 중인 배정을 잠그고 읽는다. 같은 칸의 신호 처리를 한 번에 하나씩만 하게 하는 열쇠다 */
     public Optional<LiveMapping> lockActiveMapping(long deviceId, int compartmentNo) {
         return jdbc.query("SELECT mapping_id, patient_id, prescription_id, valid_from FROM compartment_mapping "
@@ -143,6 +148,43 @@ public class DeviceSignalRepository {
                                 + "AND NOT low_stock_notified AND remaining_count <= low_stock_threshold RETURNING mapping_id",
                         new MapSqlParameterSource("id", mappingId), (rs, n) -> rs.getLong(1))
                 .isEmpty();
+    }
+
+    /**
+     * 아직 처리되지 않은 신호를 발생 시각 순으로 읽는다(잠그지 않는다). 중계 서버가 DB에 저장해 둔 신호를 처리하는 데 쓴다.
+     * 열림 신호는 버튼을 기다리는 중일 수 있어서 허용 시간이 지나 확정될 때까지 계속 나온다.
+     */
+    public List<StoredSignal> findUnprocessed(int limit) {
+        return jdbc.query("SELECT signal_id, device_id, signal_type, compartment_no, occurred_at FROM device_signal "
+                        + "WHERE processed_at IS NULL ORDER BY occurred_at, signal_id LIMIT :limit",
+                new MapSqlParameterSource("limit", limit), (rs, n) -> mapStored(rs));
+    }
+
+    /** 처리 전인 신호 한 건을 읽는다(잠그지 않는다). 그 사이 처리됐다면 비어 있다 */
+    public Optional<StoredSignal> findUnprocessedById(long signalId) {
+        return jdbc.query("SELECT signal_id, device_id, signal_type, compartment_no, occurred_at FROM device_signal "
+                                + "WHERE signal_id = :id AND processed_at IS NULL",
+                        new MapSqlParameterSource("id", signalId), (rs, n) -> mapStored(rs))
+                .stream().findFirst();
+    }
+
+    /** 처리 전인 신호 한 건을 잠그고 읽는다. 칸 배정을 먼저 잠근 뒤에 부른다(잠금 순서: 칸 배정 → 신호) */
+    public Optional<StoredSignal> lockUnprocessedById(long signalId) {
+        return jdbc.query("SELECT signal_id, device_id, signal_type, compartment_no, occurred_at FROM device_signal "
+                                + "WHERE signal_id = :id AND processed_at IS NULL FOR UPDATE",
+                        new MapSqlParameterSource("id", signalId), (rs, n) -> mapStored(rs))
+                .stream().findFirst();
+    }
+
+    /** 기기 시계가 서버보다 많이 앞서 저장된 발생 시각을 줄인다. 이미 그보다 앞서 있으면 바꾸지 않는다 */
+    public void clampOccurredAt(long signalId, OffsetDateTime clamped) {
+        jdbc.update("UPDATE device_signal SET occurred_at = :clamped WHERE signal_id = :id AND occurred_at > :clamped",
+                new MapSqlParameterSource().addValue("clamped", clamped).addValue("id", signalId));
+    }
+
+    private static StoredSignal mapStored(java.sql.ResultSet rs) throws java.sql.SQLException {
+        return new StoredSignal(rs.getLong("signal_id"), rs.getLong("device_id"), rs.getString("signal_type"),
+                rs.getInt("compartment_no"), rs.getObject("occurred_at", OffsetDateTime.class));
     }
 
     public void markProcessed(Collection<Long> signalIds, OffsetDateTime at) {

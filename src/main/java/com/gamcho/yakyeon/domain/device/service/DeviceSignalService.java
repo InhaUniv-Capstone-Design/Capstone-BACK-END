@@ -6,9 +6,11 @@ import com.gamcho.yakyeon.common.util.ApiTime;
 import com.gamcho.yakyeon.domain.device.dto.DeviceSignalRequest;
 import com.gamcho.yakyeon.domain.device.dto.DeviceSignalResponse;
 import com.gamcho.yakyeon.domain.device.entity.Device;
+import com.gamcho.yakyeon.domain.device.entity.DeviceStatus;
 import com.gamcho.yakyeon.domain.device.logic.CompartmentRules;
 import com.gamcho.yakyeon.domain.device.logic.DoseMatcher;
 import com.gamcho.yakyeon.domain.device.logic.SignalPairing;
+import com.gamcho.yakyeon.domain.device.repository.DeviceRepository;
 import com.gamcho.yakyeon.domain.device.repository.DeviceSignalRepository;
 import com.gamcho.yakyeon.domain.dose.logic.DoseRecordRules;
 import com.gamcho.yakyeon.domain.notification.service.NotificationCreator;
@@ -42,6 +44,7 @@ public class DeviceSignalService {
 
     private final DeviceAuthService deviceAuthService;
     private final DeviceSignalRepository signalRepository;
+    private final DeviceRepository deviceRepository;
     private final NotificationCreator notificationCreator;
 
     @Transactional
@@ -66,7 +69,58 @@ public class DeviceSignalService {
         if (saved.isEmpty()) {
             return DeviceSignalResponse.of(null, "DUPLICATE");
         }
-        long signalId = saved.get();
+        return route(device, saved.get(), request.getSignalType(), compartmentNo, occurredAt, now);
+    }
+
+    /**
+     * 약통이 중계 서버를 거쳐 DB에 저장해 둔 신호 한 건을 처리한다. 판정 규칙은 약통이 HTTPS로 직접 보낸 신호와 같다(route).
+     * 신호를 받은 쪽(중계 서버)은 저장만 하고 복용 판정은 여기서 한다. 각 신호는 자기 트랜잭션에서 처리한다.
+     *
+     * @return 처리 결과. 그 사이 다른 곳에서 이미 처리했다면 비어 있다
+     */
+    @Transactional
+    public Optional<DeviceSignalResponse> processStored(long signalId) {
+        Optional<DeviceSignalRepository.StoredSignal> found = signalRepository.findUnprocessedById(signalId);
+        if (found.isEmpty()) {
+            return Optional.empty();
+        }
+        DeviceSignalRepository.StoredSignal stored = found.get();
+        OffsetDateTime now = OffsetDateTime.now(ApiTime.SERVICE_ZONE);
+
+        Optional<Device> device = deviceRepository.findById(stored.deviceId());
+        if (device.isEmpty() || device.get().getStatus() != DeviceStatus.REGISTERED
+                || !CompartmentRules.isValidCompartmentNo(stored.compartmentNo(), device.get().getMaxCompartments())) {
+            // 등록이 해제된 약통의 신호, 이 약통에 없는 칸의 신호는 복용으로 볼 수 없다. 원본은 남기고 처리 완료로만 표시한다
+            signalRepository.markProcessed(List.of(signalId), now);
+            return Optional.of(DeviceSignalResponse.of(signalId, "IGNORED_INVALID_DEVICE_OR_COMPARTMENT"));
+        }
+
+        // 잠금 순서는 수신 처리와 같다: 칸 배정 → 신호
+        signalRepository.lockActiveMapping(stored.deviceId(), stored.compartmentNo());
+        if (signalRepository.lockUnprocessedById(signalId).isEmpty()) {
+            return Optional.empty();   // 잠그는 사이 다른 곳에서 처리됨
+        }
+
+        // 약통 시계가 서버보다 5분 넘게 앞서 있으면 서버가 처리하는 시각으로 바꾼다 (수신 처리와 같은 규칙)
+        OffsetDateTime occurredAt = SignalPairing.clampFuture(stored.occurredAt(), now);
+        if (!occurredAt.equals(stored.occurredAt())) {
+            signalRepository.clampOccurredAt(signalId, occurredAt);
+        }
+        return Optional.of(route(device.get(), signalId, stored.signalType(), stored.compartmentNo(), occurredAt, now));
+    }
+
+    /**
+     * 계속 처리에 실패하는 신호를 더 시도하지 않기로 하고 처리 완료로 표시한다(원본 신호는 그대로 남는다).
+     * 이렇게 하지 않으면 문제가 있는 신호 하나가 뒤의 신호 처리를 매번 방해한다.
+     */
+    @Transactional
+    public void discard(long signalId) {
+        signalRepository.markProcessed(List.of(signalId), OffsetDateTime.now(ApiTime.SERVICE_ZONE));
+    }
+
+    /** 저장된 신호 한 건의 처리: 칸 배정 확인 → 반복·열림-버튼 짝짓기 → 복용 판정. 수신 경로와 저장 경로가 함께 쓴다 */
+    private DeviceSignalResponse route(Device device, long signalId, String signalType, int compartmentNo,
+                                       OffsetDateTime occurredAt, OffsetDateTime now) {
         Duration window = windowOf(device);
 
         Optional<DeviceSignalRepository.LiveMapping> mapping =
@@ -77,7 +131,7 @@ public class DeviceSignalService {
         }
 
         Optional<OffsetDateTime> lastConfirmed = signalRepository.lastConfirmedAt(device.getDeviceId(), compartmentNo);
-        if ("BUTTON_PRESS".equals(request.getSignalType())) {
+        if ("BUTTON_PRESS".equals(signalType)) {
             return handleButton(device, mapping.get(), compartmentNo, signalId, occurredAt, lastConfirmed.orElse(null), window, now);
         }
         return handleOpen(signalId, occurredAt, lastConfirmed.orElse(null), window, now);
