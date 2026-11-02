@@ -28,6 +28,7 @@ public record PillboxResponse(
     /**
      * @param pouchPresent 약통이 보고한 "약봉지가 들어 있는지" (보고가 없으면 null)
      * @param alertActive  약통이 지금 이 칸에서 알림(부저, LED)을 울리는 중인지 (보고가 없으면 null)
+     * @param attention    확인할 것이 있으면 "OPENED"(칸을 열었는데 복용 확인이 없음), 없으면 null (항상 응답에 있다)
      */
     public record Compartment(
             @JsonProperty("compartment_no") int compartmentNo,
@@ -40,7 +41,8 @@ public record PillboxResponse(
             @JsonProperty("remaining_count") Integer remainingCount,
             @JsonProperty("low_stock") boolean lowStock,
             @JsonProperty("pouch_present") Boolean pouchPresent,
-            @JsonProperty("alert_active") Boolean alertActive
+            @JsonProperty("alert_active") Boolean alertActive,
+            @JsonProperty("attention") String attention
     ) {
     }
 

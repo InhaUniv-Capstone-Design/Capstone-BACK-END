@@ -2,6 +2,7 @@ package com.gamcho.yakyeon.domain.device.controller;
 
 import com.gamcho.yakyeon.domain.device.dto.DeviceRegisterRequest;
 import com.gamcho.yakyeon.domain.device.dto.DeviceResponse;
+import com.gamcho.yakyeon.domain.device.dto.DeviceSettingsRequest;
 import com.gamcho.yakyeon.domain.device.service.DeviceService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -10,6 +11,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -38,6 +40,15 @@ public class DeviceController {
             @AuthenticationPrincipal Long userId,
             @PathVariable("patientId") Long patientId) {
         return ResponseEntity.ok(deviceService.get(userId, patientId));
+    }
+
+    /** 부저·LED 설정 변경. 보낸 항목만 바뀌고, 응답은 약통 정보 전체다 (GET과 같은 모양) */
+    @PatchMapping("/patients/{patientId}/device/settings")
+    public ResponseEntity<DeviceResponse> updateSettings(
+            @AuthenticationPrincipal Long userId,
+            @PathVariable("patientId") Long patientId,
+            @Valid @RequestBody DeviceSettingsRequest request) {
+        return ResponseEntity.ok(deviceService.updateSettings(userId, patientId, request));
     }
 
     @DeleteMapping("/patients/{patientId}/device")

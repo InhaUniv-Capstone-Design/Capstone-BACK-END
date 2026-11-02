@@ -93,6 +93,17 @@ public class Device {
     @Column(name = "online_changed_at")
     private OffsetDateTime onlineChangedAt;
 
+    /**
+     * 복약 예정 시간에 부저·LED로 알릴지(앱의 약통 설정). 중계 서버가 이 값을 읽어 약통에 전달한다.
+     * 앱의 설정 변경은 두 컬럼만 바꾸는 SQL로 하고(DeviceService.updateSettings), 중계 서버가 같은 행의 다른 컬럼을
+     * 갱신하는 중이라서 엔티티 저장이 이 값을 옛 값으로 덮어쓰지 않도록 수정 대상에서 뺀다.
+     */
+    @Column(name = "buzzer_enabled", nullable = false, updatable = false)
+    private boolean buzzerEnabled;
+
+    @Column(name = "led_enabled", nullable = false, updatable = false)
+    private boolean ledEnabled;
+
     @Builder
     public Device(String serialNo, String secretHash, Long patientId, Long ownerConfirmedBy,
                   Short maxCompartments, OffsetDateTime registeredAt) {
@@ -105,6 +116,9 @@ public class Device {
         this.status = DeviceStatus.REGISTERED;
         this.scheduleSyncedVer = 0;
         this.online = false;
+        // 새 약통은 알림이 켜진 상태로 시작한다 (DB 기본값과 같다. 자바 기본값 false가 등록 때 들어가지 않게 한다)
+        this.buzzerEnabled = true;
+        this.ledEnabled = true;
     }
 
     /** 기기가 상태를 보고했다 (마지막 접속 시각 갱신, 온라인으로 표시, 보고된 항목만 반영) */

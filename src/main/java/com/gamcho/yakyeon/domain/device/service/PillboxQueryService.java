@@ -10,6 +10,7 @@ import com.gamcho.yakyeon.domain.device.entity.CompartmentMapping;
 import com.gamcho.yakyeon.domain.device.entity.Device;
 import com.gamcho.yakyeon.domain.device.entity.DeviceStatus;
 import com.gamcho.yakyeon.domain.device.entity.MappingStatus;
+import com.gamcho.yakyeon.domain.device.logic.AttentionRules;
 import com.gamcho.yakyeon.domain.device.logic.CompartmentRules;
 import com.gamcho.yakyeon.domain.device.repository.CompartmentMappingRepository;
 import com.gamcho.yakyeon.domain.device.repository.DeviceRepository;
@@ -24,10 +25,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -67,6 +71,7 @@ public class PillboxQueryService {
                 .collect(Collectors.toMap(Prescription::getPrescriptionId, Prescription::getHospitalName));
         Map<Long, List<PillboxResponse.Medication>> medsByPrescription = medicationsByPrescription(patientId, prescriptionIds);
         Map<Integer, ReportedState> reported = reportedStates(device.getDeviceId());
+        Set<Integer> opened = openedCompartments(device.getDeviceId());
 
         List<PillboxResponse.Compartment> compartments = new ArrayList<>();
         for (int no = 1; no <= device.getMaxCompartments(); no++) {
@@ -76,7 +81,7 @@ public class PillboxQueryService {
             Boolean alert = rs == null ? null : rs.alertActive();
             if (m == null) {
                 compartments.add(new PillboxResponse.Compartment(no, PillboxResponse.State.EMPTY, null, null, null,
-                        List.of(), null, null, false, pouch, alert));
+                        List.of(), null, null, false, pouch, alert, null));
             } else {
                 compartments.add(new PillboxResponse.Compartment(no,
                         PillboxResponse.State.valueOf(m.getStatus().name()),
@@ -85,7 +90,7 @@ public class PillboxQueryService {
                         medsByPrescription.getOrDefault(m.getPrescriptionId(), List.of()),
                         m.getLoadedCount(), m.getRemainingCount(),
                         CompartmentRules.isLowStock(m.getStatus().name(), m.getRemainingCount(), m.getLowStockThreshold()),
-                        pouch, alert));
+                        pouch, alert, opened.contains(no) ? AttentionRules.OPENED : null));
             }
         }
         return new PillboxResponse(
@@ -109,6 +114,24 @@ public class PillboxQueryService {
             result.computeIfAbsent(m.getPrescription().getPrescriptionId(), k -> new ArrayList<>())
                     .add(new PillboxResponse.Medication(m.getMedicationId(), m.getInputName()));
         }
+        return result;
+    }
+
+    /**
+     * "확인 필요"인 칸 번호: 칸을 열었지만 복용 확인이 없는 이벤트(열림만 있음)가 최근 60분 안에 있고, 그 뒤에 같은 칸의
+     * 복용 확인이 없는 칸. 지금 쓰는 칸 배정의 이벤트만 센다(끝난 배정의 옛 이벤트는 새로 배정한 칸에 영향을 주지 않는다).
+     */
+    private Set<Integer> openedCompartments(Long deviceId) {
+        OffsetDateTime since = AttentionRules.since(OffsetDateTime.now(ApiTime.SERVICE_ZONE));
+        Set<Integer> result = new HashSet<>();
+        jdbcTemplate.query("SELECT DISTINCT e.compartment_no FROM intake_event e "
+                        + "JOIN compartment_mapping m ON m.mapping_id = e.mapping_id AND m.status <> 'ENDED' "
+                        + "WHERE e.device_id = ? AND e.detection = 'OPEN_ONLY' AND e.occurred_at >= ? "
+                        + "AND NOT EXISTS (SELECT 1 FROM intake_event c WHERE c.device_id = e.device_id "
+                        + "AND c.compartment_no = e.compartment_no AND c.confirmed_at IS NOT NULL AND c.confirmed_at > e.occurred_at)",
+                rs -> {
+                    result.add(rs.getInt("compartment_no"));
+                }, deviceId, since);
         return result;
     }
 
