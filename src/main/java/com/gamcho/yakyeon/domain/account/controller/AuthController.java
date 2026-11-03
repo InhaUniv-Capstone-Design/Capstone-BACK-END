@@ -1,5 +1,6 @@
 package com.gamcho.yakyeon.domain.account.controller;
 
+import com.gamcho.yakyeon.common.ratelimit.RateLimit;
 import com.gamcho.yakyeon.domain.account.consent.ConsentExempt;
 import com.gamcho.yakyeon.domain.account.dto.AccountDeleteRequest;
 import com.gamcho.yakyeon.domain.account.dto.CheckIdResponse;
@@ -7,12 +8,12 @@ import com.gamcho.yakyeon.domain.account.dto.LoginRequest;
 import com.gamcho.yakyeon.domain.account.dto.LoginResponse;
 import com.gamcho.yakyeon.domain.account.dto.PasswordChangeRequest;
 import com.gamcho.yakyeon.domain.account.dto.RefreshRequest;
+import com.gamcho.yakyeon.domain.account.dto.SignupPhoneConfirmRequest;
 import com.gamcho.yakyeon.domain.account.dto.SignupPhoneConfirmResponse;
 import com.gamcho.yakyeon.domain.account.dto.SignupPhoneSendRequest;
+import com.gamcho.yakyeon.domain.account.dto.SignupPhoneSendResponse;
 import com.gamcho.yakyeon.domain.account.dto.SignupRequest;
 import com.gamcho.yakyeon.domain.account.dto.SignupResponse;
-import com.gamcho.yakyeon.domain.account.dto.VerificationConfirmRequest;
-import com.gamcho.yakyeon.domain.account.dto.VerificationSendResponse;
 import com.gamcho.yakyeon.domain.account.service.AuthService;
 import com.gamcho.yakyeon.domain.account.service.SignupVerificationService;
 import jakarta.validation.Valid;
@@ -44,18 +45,20 @@ public class AuthController {
     }
 
     /** 회원가입 화면의 "인증번호 받기" - 계정이 없으므로 로그인 없이 호출 */
+    @RateLimit(name = "signup-phone-send", limit = 30, windowSeconds = 3600)
     @PostMapping("/phone-verifications")
-    public ResponseEntity<VerificationSendResponse> sendSignupCode(
+    public ResponseEntity<SignupPhoneSendResponse> sendSignupCode(
             @Valid @RequestBody SignupPhoneSendRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(signupVerificationService.send(request.getPhone()));
     }
 
     /** 인증번호 입력 확인. 성공하면 가입 요청에 같이 보낼 verification_token을 돌려준다 */
+    @RateLimit(name = "signup-phone-confirm", limit = 120, windowSeconds = 3600)
     @PostMapping("/phone-verifications/{verificationId}/confirm")
     public ResponseEntity<SignupPhoneConfirmResponse> confirmSignupCode(
             @PathVariable("verificationId") Long verificationId,
-            @Valid @RequestBody VerificationConfirmRequest request) {
-        return ResponseEntity.ok(signupVerificationService.confirm(verificationId, request.getCode()));
+            @Valid @RequestBody SignupPhoneConfirmRequest request) {
+        return ResponseEntity.ok(signupVerificationService.confirm(verificationId, request.getCode(), request.getPhone()));
     }
 
     @GetMapping("/check-id")

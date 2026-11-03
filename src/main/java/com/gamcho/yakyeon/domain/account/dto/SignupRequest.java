@@ -70,7 +70,7 @@ public class SignupRequest {
     /** 하이픈 없이 숫자만 (예: 01012345678). 서버에서 암호화해 저장하고 평문은 남기지 않는다 */
     @JsonProperty("phone")
     @NotBlank(message = "휴대폰 번호를 입력해주세요.")
-    @Pattern(regexp = "^01[016789][0-9]{7,8}$", message = "휴대폰 번호 형식이 올바르지 않습니다. (예: 01012345678)")
+    @Pattern(regexp = InputRules.PHONE_REGEX, message = InputRules.PHONE_MESSAGE)
     private String phone;
 
     /** POST /auth/phone-verifications 응답의 verification_id */

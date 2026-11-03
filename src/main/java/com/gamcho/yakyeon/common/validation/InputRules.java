@@ -24,6 +24,13 @@ public final class InputRules {
     public static final String PASSWORD_MESSAGE =
             "비밀번호는 영문, 숫자, 특수문자를 모두 포함한 8~64자여야 합니다. (공백, 한글은 사용할 수 없습니다)";
 
+    /**
+     * 010으로 시작하는 11자리 숫자. 문자 인증 업체(OCTOMO)가 이 형식만 받는다. 앱은 이미 010 번호만 보낸다.
+     * 하이픈이 섞인 값은 PhoneNumbers.normalize로 먼저 숫자만 남긴 뒤 검사한다.
+     */
+    public static final String PHONE_REGEX = "^010[0-9]{8}$";
+    public static final String PHONE_MESSAGE = "휴대폰 번호 형식이 올바르지 않습니다. (예: 01012345678)";
+
     private static final Pattern LOGIN_ID = Pattern.compile(LOGIN_ID_REGEX);
     private static final Pattern PASSWORD = Pattern.compile(PASSWORD_REGEX);
 

@@ -70,6 +70,10 @@ public enum ErrorCode {
     VERIFICATION_EXPIRED(HttpStatus.BAD_REQUEST, "인증 시간이 만료되었습니다. 인증번호를 다시 요청해주세요."),
     VERIFICATION_ATTEMPTS_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS, "인증번호 입력 가능 횟수를 초과했습니다. 인증번호를 다시 요청해주세요."),
     VERIFICATION_RATE_LIMITED(HttpStatus.TOO_MANY_REQUESTS, "인증번호 요청이 너무 많습니다. 잠시 후 다시 시도해주세요."),
+    /** 문자 인증 업체(OCTOMO)에 연결하지 못했거나 하루 호출 한도를 넘음 */
+    VERIFICATION_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "문자 인증을 지금 사용할 수 없습니다. 잠시 후 다시 시도해주세요."),
+    /** 같은 접속 주소가 짧은 시간에 너무 많이 요청함 (공개 API 호출 제한) */
+    RATE_LIMITED(HttpStatus.TOO_MANY_REQUESTS, "요청이 너무 많습니다. 잠시 후 다시 시도해주세요."),
     VERIFICATION_REQUIRED(HttpStatus.BAD_REQUEST, "동의하려면 문자 인증이 필요합니다."),
     VERIFICATION_NOT_COMPLETED(HttpStatus.BAD_REQUEST, "문자 인증이 완료되지 않았습니다."),
     VERIFICATION_PURPOSE_MISMATCH(HttpStatus.BAD_REQUEST, "이 동의에 사용할 수 없는 인증입니다."),
