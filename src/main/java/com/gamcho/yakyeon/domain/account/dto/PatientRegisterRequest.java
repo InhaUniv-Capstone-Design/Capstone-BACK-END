@@ -1,6 +1,7 @@
 package com.gamcho.yakyeon.domain.account.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.gamcho.yakyeon.common.validation.InputRules;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Past;
@@ -32,6 +33,6 @@ public class PatientRegisterRequest {
     /** 하이픈 없이 숫자만 (예: 01012345678). 서버에서 암호화해서 저장하고 평문은 남기지 않음 */
     @JsonProperty("phone")
     @NotBlank(message = "휴대폰 번호를 입력해주세요.")
-    @Pattern(regexp = "^01[016789][0-9]{7,8}$", message = "휴대폰 번호 형식이 올바르지 않습니다. (예: 01012345678)")
+    @Pattern(regexp = InputRules.PHONE_REGEX, message = InputRules.PHONE_MESSAGE)
     private String phone;
 }

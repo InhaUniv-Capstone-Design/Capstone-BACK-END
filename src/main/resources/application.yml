@@ -27,3 +27,23 @@ encryption:
 
 server:
   port: 8080
+
+# 가입 문자 인증 방식
+#  mock  : (기본, 개발용) 인증번호를 서버 로그에 남기고 사용자가 입력한다
+#  octomo: 사용자가 인증번호를 자기 휴대폰에서 OCTOMO 대표번호로 문자로 보내고, 서버가 OCTOMO에 조회한다
+phone-verification:
+  provider: ${PHONE_VERIFICATION_PROVIDER:mock}
+
+octomo:
+  api-key: ${OCTOMO_API_KEY:}              # 옥토모 마이페이지의 API Key. 파일에 적지 말고 환경변수로만 넣는다
+  base-url: https://api.octoverse.kr/octomo/v1
+  representative-number: "16663538"        # 사용자가 문자를 보낼 대표번호(1666-3538)
+  daily-call-limit: 300                    # 하루 호출 한도. 무료 플랜 월 10,000건을 넘지 않게 한다 (0이면 제한 없음)
+
+# 문자 발송 방식(옛 보호자 연동 방식용). 실제 서버에서는 disabled로 둬서 인증번호를 로그에 남기는 mock을 쓰지 않는다
+sms:
+  provider: ${SMS_PROVIDER:mock}
+
+# 공개 API의 접속 주소별 호출 제한 (시험할 때만 false)
+rate-limit:
+  enabled: true

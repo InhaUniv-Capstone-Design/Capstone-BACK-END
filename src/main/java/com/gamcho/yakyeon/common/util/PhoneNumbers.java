@@ -8,7 +8,8 @@ import java.util.regex.Pattern;
  */
 public final class PhoneNumbers {
 
-    private static final Pattern MOBILE = Pattern.compile("^01[016789][0-9]{7,8}$");
+    /** 010으로 시작하는 11자리. 문자 인증 업체(OCTOMO)가 이 형식만 받아서 맞췄다 (InputRules.PHONE_REGEX와 같다) */
+    private static final Pattern MOBILE = Pattern.compile("^010[0-9]{8}$");
 
     private PhoneNumbers() {
     }
