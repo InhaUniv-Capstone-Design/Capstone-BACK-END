@@ -1,5 +1,6 @@
 package com.gamcho.yakyeon.domain.notification.repository;
 
+import com.gamcho.yakyeon.domain.notification.logic.NotificationItemRules;
 import com.gamcho.yakyeon.domain.notification.logic.NotificationKind;
 import com.gamcho.yakyeon.domain.notification.logic.NotificationSettingKey;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
@@ -65,14 +66,23 @@ public class NotificationWriteRepository {
         this.jdbc = jdbc;
     }
 
-    /** 연동된 보호자에게 알림을 만든다. 만든 건수를 돌려준다 */
+    /**
+     * 연동된 보호자에게 알림을 만든다. 만든 건수를 돌려준다.
+     * 복약자가 그 알림이 속한 열람 항목(NotificationItemRules)을 허용한 보호자에게만 만든다. 허용하지 않은 보호자는 받는 사람에서 빠진다.
+     */
     public int insertForGuardians(long patientId, NotificationKind kind, NotificationSettingKey settingKey,
                                   Links links, boolean dedupe) {
+        String item = NotificationItemRules.requiredItem(kind.type());
+        if (item == null) {
+            // 보호자에게 보내지 않는 종류를 보호자에게 만들려는 코드 실수. 열람 항목이 정해지지 않은 알림은 만들지 않는다
+            throw new IllegalArgumentException("보호자에게 보내는 알림은 열람 항목이 정해져 있어야 합니다: " + kind.type());
+        }
         String recipient = "g.guardian_user_id";
         String sql = INSERT_COLUMNS + String.format(SELECT_VALUES, recipient)
                 + "FROM guardian_link g WHERE g.patient_id = :patientId AND g.status = 'ACTIVE' "
+                + "AND CAST(:requiredItem AS VARCHAR(20)) = ANY(g.shared_items) "
                 + settingClause(recipient, settingKey) + dedupeClause(recipient, links, dedupe) + conflictClause(links);
-        return jdbc.update(sql, params(patientId, kind, settingKey, links));
+        return jdbc.update(sql, params(patientId, kind, settingKey, links).addValue("requiredItem", item));
     }
 
     /** 복약자 본인에게 알림을 만든다 (앱 계정이 없으면 만들 곳이 없다). 만든 건수를 돌려준다 */

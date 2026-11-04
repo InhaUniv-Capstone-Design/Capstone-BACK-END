@@ -20,7 +20,10 @@ import org.springframework.stereotype.Service;
  *  복용 시간 알림(예정 10분 전)       → 복약자 본인 (DOSE_REMINDER)
  *  미복용 알림(예정 30분 후, 본인용)   → 복약자 본인 (MISSED)
  *  복용 종료 예정(마지막 복용일 3일 전) → 복약자 본인 (END_SOON)
- *  병용금기 새 등재                   → 복약자 본인 (끄는 설정 없음). 보호자는 열람 범위(DUR_INFO) 적용 단계에서 더한다
+ *  병용금기 새 등재                   → 복약자 본인 + 연동된 보호자 중 병용금기 정보(DUR_INFO)를 허용한 사람 (끄는 설정 없음)
+ *
+ * 보호자에게 가는 알림은 모두 복약자가 그 알림이 속한 열람 항목을 허용한 보호자에게만 만들어진다(NotificationItemRules):
+ * 복용 확인·미복용은 DOSE_RECORD, 약통 열림·이상·약 부족은 DEVICE_EVENT, 병용금기는 DUR_INFO.
  */
 @Service
 @RequiredArgsConstructor
@@ -72,11 +75,13 @@ public class NotificationCreator {
 
     /**
      * 병용금기로 등재된 새 약 조합이 확인됐다 (병용금기 검사 한 번에 한 건, 호출하는 쪽이 새 쌍이 있을 때만 부른다).
+     * 복약자 본인과, 복약자가 병용금기 정보(DUR_INFO)를 허용한 연동 보호자에게 만든다. 끄는 설정은 없다.
      * 검사마다 번호가 달라서 같은 알림이 겹칠 일이 없으므로 중복 확인은 하지 않는다.
      */
     public int onInteractionFound(long patientId, long checkId) {
-        return notificationWriteRepository.insertForPatient(patientId, NotificationKind.INTERACTION_INFO, null,
-                new Links(null, null, null, null, null, checkId), false);
+        Links links = new Links(null, null, null, null, null, checkId);
+        return notificationWriteRepository.insertForPatient(patientId, NotificationKind.INTERACTION_INFO, null, links, false)
+                + notificationWriteRepository.insertForGuardians(patientId, NotificationKind.INTERACTION_INFO, null, links, false);
     }
 
     /** 약통에 이상이 생겼다 (정상에서 이상으로 바뀌는 순간에만 호출된다) */

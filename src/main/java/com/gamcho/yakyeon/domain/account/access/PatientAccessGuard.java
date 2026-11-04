@@ -2,12 +2,14 @@ package com.gamcho.yakyeon.domain.account.access;
 
 import com.gamcho.yakyeon.common.exception.BusinessException;
 import com.gamcho.yakyeon.common.exception.ErrorCode;
+import com.gamcho.yakyeon.domain.account.consent.SharedItemRules;
 import com.gamcho.yakyeon.domain.account.entity.AppUser;
 import com.gamcho.yakyeon.domain.account.entity.GuardianLink;
 import com.gamcho.yakyeon.domain.account.entity.Patient;
 import com.gamcho.yakyeon.domain.account.repository.AppUserRepository;
 import com.gamcho.yakyeon.domain.account.repository.GuardianLinkRepository;
 import com.gamcho.yakyeon.domain.account.repository.PatientRepository;
+import com.gamcho.yakyeon.domain.account.repository.SharedItemsRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -25,6 +27,7 @@ import java.util.List;
  *  2) 대상 복약자가 활성(ACTIVE)인가 - 탈퇴한 복약자의 데이터는 접근 불가
  *  3) 복약자 본인인가 - 통과
  *  4) 연동(ACTIVE)이 있는 보호자인가, 그 권한 범위가 행동에 충분한가
+ *  5) 복약자가 그 정보를 보호자에게 공유하도록 허용했는가 (열람 범위 shared_items, 아래 SharedItemRequirements)
  *
  * 응답 코드: 대상이 없거나 연동이 전혀 없으면 둘 다 404(PATIENT_NOT_FOUND)로 똑같이 응답해서
  * "그 복약자가 존재하는지"가 드러나지 않게 한다. 연동은 있는데 권한이 모자란 경우만 403.
@@ -40,6 +43,7 @@ public class PatientAccessGuard {
     private final PatientRepository patientRepository;
     private final GuardianLinkRepository guardianLinkRepository;
     private final AccessAuditWriter auditWriter;
+    private final SharedItemsRepository sharedItemsRepository;
 
     /**
      * @param resourceType 접근하는 데이터 종류 (예: "patient", "patient_medication") - 접근 기록에 남는다
@@ -85,6 +89,14 @@ public class PatientAccessGuard {
         if (!link.permits(action.requiredScope())) {
             deny(userId, actorRole, patientId, link.getLinkId(), action, resourceType, resourceId);
             throw new BusinessException(ErrorCode.INSUFFICIENT_PERMISSION);
+        }
+
+        // 복약자가 허용한 열람 항목 안에서만 접근할 수 있다. 어떤 자원이 어떤 항목에 속하는지는 SharedItemRequirements가 정한다.
+        // 모르는 자원 종류는 허용하지 않는다. 복약자 본인에게는 적용하지 않는다(위에서 이미 통과했다).
+        List<String> shared = SharedItemRules.parse(sharedItemsRepository.findSharedItemsText(link.getLinkId()));
+        if (!SharedItemRequirements.allows(resourceType, shared)) {
+            deny(userId, actorRole, patientId, link.getLinkId(), action, resourceType, resourceId);
+            throw new BusinessException(ErrorCode.SHARE_NOT_GRANTED);
         }
 
         auditWriter.write(userId, AccessRole.GUARDIAN, patientId, link.getLinkId(),
