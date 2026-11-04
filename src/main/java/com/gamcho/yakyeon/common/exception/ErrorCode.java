@@ -66,6 +66,14 @@ public enum ErrorCode {
     LEGAL_REP_PHONE_REQUIRED(HttpStatus.BAD_REQUEST, "만 14세 미만 복약자는 법정대리인 휴대폰 번호가 필요합니다."),
     LEGAL_REP_NAME_REQUIRED(HttpStatus.BAD_REQUEST, "만 14세 미만 복약자는 동의 시 법정대리인 이름이 필요합니다."),
     LEGAL_REP_PHONE_SAME_AS_PATIENT(HttpStatus.BAD_REQUEST, "법정대리인 휴대폰 번호는 복약자 본인 번호와 달라야 합니다."),
+    /** 만 14세 미만 복약자가 웹에서 스스로 열람 범위에 동의하려 함 (법정대리인 동의가 필요) */
+    LEGAL_REP_REQUIRED(HttpStatus.FORBIDDEN, "만 14세 미만은 법정대리인의 동의가 필요해서 이 화면에서는 동의할 수 없습니다."),
+    /** 복약자 웹 동의: 복약자 전용 기능을 보호자 계정이 호출 */
+    PATIENT_ONLY(HttpStatus.FORBIDDEN, "복약자 계정만 사용할 수 있는 기능입니다."),
+    /** 대리인 아이디가 없거나, 보호자 계정이 아니거나, 탈퇴한 계정 (셋을 구분하지 않는다) */
+    GUARDIAN_NOT_FOUND(HttpStatus.NOT_FOUND, "대리인(보호자)을 찾을 수 없습니다. 아이디를 확인해주세요."),
+    /** 열람 범위 변경에서 필수 3개 항목을 비동의로 바꾸려 함 */
+    REQUIRED_CONSENT_ITEM(HttpStatus.BAD_REQUEST, "필수 항목은 동의 상태를 바꿀 수 없습니다. 연동을 끊으려면 연동 해제를 사용해주세요."),
     VERIFICATION_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 인증 요청입니다."),
     VERIFICATION_EXPIRED(HttpStatus.BAD_REQUEST, "인증 시간이 만료되었습니다. 인증번호를 다시 요청해주세요."),
     VERIFICATION_ATTEMPTS_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS, "인증번호 입력 가능 횟수를 초과했습니다. 인증번호를 다시 요청해주세요."),

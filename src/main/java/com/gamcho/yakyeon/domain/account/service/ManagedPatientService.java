@@ -1,7 +1,10 @@
 package com.gamcho.yakyeon.domain.account.service;
 
+import com.gamcho.yakyeon.domain.account.consent.SharedItemRules;
 import com.gamcho.yakyeon.domain.account.dto.ManagedPatientResponse;
+import com.gamcho.yakyeon.domain.account.logic.PhoneMasker;
 import com.gamcho.yakyeon.domain.account.repository.AccountQueryRepository;
+import com.gamcho.yakyeon.security.PhoneEncryptor;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,9 +21,25 @@ import java.util.List;
 public class ManagedPatientService {
 
     private final AccountQueryRepository accountQueryRepository;
+    private final PhoneEncryptor phoneEncryptor;
 
     @Transactional(readOnly = true)
     public List<ManagedPatientResponse> list(Long userId) {
-        return accountQueryRepository.findManagedPatients(userId);
+        return accountQueryRepository.findManagedPatients(userId).stream().map(this::toResponse).toList();
+    }
+
+    /**
+     * 보호자로 연동된 행에는 복약자가 허용한 열람 항목(shared_items)을 담는다. 복약자의 휴대폰 번호는 이름·연락처(PERSONAL_INFO)를
+     * 허용했을 때만, 그리고 가려서(010-****-5678) 내려준다. 본인 행에는 해당 없다.
+     */
+    private ManagedPatientResponse toResponse(AccountQueryRepository.ManagedRow r) {
+        boolean guardianRow = "GUARDIAN".equals(r.myRole());
+        List<String> items = guardianRow ? SharedItemRules.parse(r.sharedItems()) : null;
+        String phoneMasked = null;
+        if (guardianRow && items.contains(SharedItemRules.PERSONAL_INFO) && r.phoneEnc() != null) {
+            phoneMasked = PhoneMasker.mask(phoneEncryptor.decrypt(r.phoneEnc()));
+        }
+        return new ManagedPatientResponse(r.patientId(), r.name(), r.birthDate(), r.hasAccount(), r.myRole(), r.linkId(),
+                r.permissionScope(), r.linkedAt(), guardianRow ? r.relationship() : null, items, phoneMasked);
     }
 }
