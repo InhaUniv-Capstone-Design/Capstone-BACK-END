@@ -2,6 +2,7 @@ package com.gamcho.yakyeon.domain.notification.repository;
 
 import com.gamcho.yakyeon.common.util.ApiTime;
 import com.gamcho.yakyeon.domain.notification.dto.NotificationResponse;
+import com.gamcho.yakyeon.domain.notification.logic.NotificationItemRules;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -19,10 +20,15 @@ import java.util.List;
 @Repository
 public class NotificationRepository {
 
-    /** 알림(n)이 가리키는 복약자(p)를 받는 사람(:me)이 지금도 볼 수 있는 조건 */
+    /**
+     * 알림(n)이 가리키는 복약자(p)를 받는 사람(:me)이 지금도 볼 수 있는 조건.
+     * 보호자는 연동이 활성이고 복약자가 그 알림이 속한 열람 항목(NotificationItemRules)을 지금도 허용했을 때만 본다.
+     * 복약자가 항목을 허용하지 않기로 바꾸면 이미 받은 그 항목의 알림도 바로 사라진다.
+     */
     private static final String VISIBLE =
             "(p.user_id = :me OR EXISTS (SELECT 1 FROM guardian_link g WHERE g.patient_id = n.patient_id "
-                    + "AND g.guardian_user_id = :me AND g.status = 'ACTIVE'))";
+                    + "AND g.guardian_user_id = :me AND g.status = 'ACTIVE' AND "
+                    + NotificationItemRules.caseSql("n.notif_type") + " = ANY(g.shared_items)))";
 
     private final NamedParameterJdbcTemplate jdbc;
 

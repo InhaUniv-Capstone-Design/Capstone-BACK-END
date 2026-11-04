@@ -72,6 +72,8 @@ public enum ErrorCode {
     PATIENT_ONLY(HttpStatus.FORBIDDEN, "복약자 계정만 사용할 수 있는 기능입니다."),
     /** 대리인 아이디가 없거나, 보호자 계정이 아니거나, 탈퇴한 계정 (셋을 구분하지 않는다) */
     GUARDIAN_NOT_FOUND(HttpStatus.NOT_FOUND, "대리인(보호자)을 찾을 수 없습니다. 아이디를 확인해주세요."),
+    /** 보호자가 복약자가 공유를 허용하지 않은 항목에 접근함 (복약자 웹 동의의 열람 범위) */
+    SHARE_NOT_GRANTED(HttpStatus.FORBIDDEN, "복약자가 공유를 허용하지 않은 정보입니다."),
     /** 열람 범위 변경에서 필수 3개 항목을 비동의로 바꾸려 함 */
     REQUIRED_CONSENT_ITEM(HttpStatus.BAD_REQUEST, "필수 항목은 동의 상태를 바꿀 수 없습니다. 연동을 끊으려면 연동 해제를 사용해주세요."),
     VERIFICATION_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 인증 요청입니다."),
