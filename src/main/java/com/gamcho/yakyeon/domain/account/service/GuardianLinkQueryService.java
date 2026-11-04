@@ -3,6 +3,7 @@ package com.gamcho.yakyeon.domain.account.service;
 import com.gamcho.yakyeon.common.exception.BusinessException;
 import com.gamcho.yakyeon.common.exception.ErrorCode;
 import com.gamcho.yakyeon.common.util.ApiTime;
+import com.gamcho.yakyeon.domain.account.consent.SharedItemRules;
 import com.gamcho.yakyeon.domain.account.dto.GuardianLinkItemResponse;
 import com.gamcho.yakyeon.domain.account.repository.AccountQueryRepository;
 import lombok.RequiredArgsConstructor;
@@ -43,7 +44,8 @@ public class GuardianLinkQueryService {
                 .map(r -> new GuardianLinkItemResponse(r.linkId(),
                         r.guardianName() == null ? null : GuardianLinkService.maskName(r.guardianName()),
                         r.guardianLoginId(), r.status(), r.permissionScope(), r.consentSubject(),
-                        r.consentedAt() == null ? null : r.consentedAt().atZoneSameInstant(ApiTime.SERVICE_ZONE).toOffsetDateTime()))
+                        r.consentedAt() == null ? null : r.consentedAt().atZoneSameInstant(ApiTime.SERVICE_ZONE).toOffsetDateTime(),
+                        r.relationship(), "ACTIVE".equals(r.status()) ? SharedItemRules.parse(r.sharedItems()) : List.of()))
                 .toList();
     }
 }
