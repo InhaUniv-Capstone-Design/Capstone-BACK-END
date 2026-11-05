@@ -2,6 +2,7 @@ package com.gamcho.yakyeon.domain.device.service;
 
 import com.gamcho.yakyeon.common.exception.BusinessException;
 import com.gamcho.yakyeon.common.exception.ErrorCode;
+import com.gamcho.yakyeon.common.ratelimit.FixedWindowCounter;
 import com.gamcho.yakyeon.common.util.ApiTime;
 import com.gamcho.yakyeon.domain.account.access.AccessAction;
 import com.gamcho.yakyeon.domain.account.access.PatientAccessGuard;
@@ -11,7 +12,9 @@ import com.gamcho.yakyeon.domain.device.dto.DeviceResponse;
 import com.gamcho.yakyeon.domain.device.dto.DeviceSettingsRequest;
 import com.gamcho.yakyeon.domain.device.entity.Device;
 import com.gamcho.yakyeon.domain.device.entity.DeviceStatus;
+import com.gamcho.yakyeon.domain.device.logic.DeviceInventoryRules;
 import com.gamcho.yakyeon.domain.device.logic.DeviceSecrets;
+import com.gamcho.yakyeon.domain.device.repository.DeviceInventoryRepository;
 import com.gamcho.yakyeon.domain.device.repository.DeviceRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -19,12 +22,16 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.time.OffsetDateTime;
 
 /**
  * 앱에서 약통을 등록·조회·해제한다. 복약자의 건강정보를 수집하는 기기를 연결하는 일이라
  * 등록과 해제는 수정 권한(본인 또는 읽기·쓰기 권한 보호자), 조회는 조회 권한이 필요하다.
  * 복약자 한 명에게는 약통 하나만 등록할 수 있다.
+ *
+ * 등록할 때는 약통에 적힌 시리얼번호와 비밀값을 출고 약통 목록(device_inventory)과 대조한다. 목록에 있고 비밀값이 맞을 때만
+ * 등록되고, 목록에 없는 시리얼이든 비밀값이 틀렸든 같은 오류(DEVICE_CREDENTIALS_INVALID)를 돌려준다.
  */
 @Service
 @RequiredArgsConstructor
@@ -37,12 +44,28 @@ public class DeviceService {
     private final ConsentGuard consentGuard;
     private final DeviceRepository deviceRepository;
     private final JdbcTemplate jdbcTemplate;
+    private final DeviceInventoryRepository deviceInventoryRepository;
+
+    /** 약통 등록 시도 횟수 (계정당, 서버 메모리). 비밀값을 계속 바꿔 가며 맞춰 보는 시도를 막는다 */
+    private static final int REGISTER_ATTEMPTS_PER_HOUR = 20;
+    private final FixedWindowCounter registerLimiter = new FixedWindowCounter(20_000);
 
     @Transactional
     public DeviceResponse register(Long userId, Long patientId, DeviceRegisterRequest request) {
         patientAccessGuard.check(userId, patientId, AccessAction.UPDATE, RESOURCE_TYPE, null);
         // 약통 등록 전 스마트 약통 연결 동의(DEVICE)가 있어야 한다. 요청한 사람 본인의 동의를 본다
         consentGuard.requireDevice(userId);
+
+        if (!registerLimiter.tryAcquire("device-register|" + userId, REGISTER_ATTEMPTS_PER_HOUR, 3600,
+                Instant.now().getEpochSecond())) {
+            throw new BusinessException(ErrorCode.RATE_LIMITED);
+        }
+
+        // 출고 목록 대조가 먼저다: 이 약통을 쓸 수 있는 사람(비밀값을 아는 사람)에게만 "이미 다른 사람이 등록했다"를 알려 준다
+        String inventoryHash = deviceInventoryRepository.findSecretHash(request.getSerialNo()).orElse(null);
+        if (!DeviceInventoryRules.isRegistrable(request.getSecret(), inventoryHash)) {
+            throw new BusinessException(ErrorCode.DEVICE_CREDENTIALS_INVALID);
+        }
 
         if (deviceRepository.existsByPatientIdAndStatus(patientId, DeviceStatus.REGISTERED)) {
             throw new BusinessException(ErrorCode.DEVICE_ALREADY_REGISTERED);
@@ -68,6 +91,10 @@ public class DeviceService {
             String cause = e.getMostSpecificCause().getMessage();
             if (cause != null && cause.contains("uq_device_serial_registered")) {
                 throw new BusinessException(ErrorCode.DEVICE_SERIAL_IN_USE);
+            }
+            if (cause != null && cause.contains("fk_device_inventory")) {
+                // 대조한 뒤 저장하기 전에 출고 목록에서 빠진 드문 경우
+                throw new BusinessException(ErrorCode.DEVICE_CREDENTIALS_INVALID);
             }
             throw new BusinessException(ErrorCode.DEVICE_ALREADY_REGISTERED);
         }

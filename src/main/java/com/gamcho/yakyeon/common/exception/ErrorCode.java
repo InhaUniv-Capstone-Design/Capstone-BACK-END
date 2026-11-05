@@ -121,6 +121,8 @@ public enum ErrorCode {
     DEVICE_NOT_FOUND(HttpStatus.NOT_FOUND, "등록된 약통이 없습니다."),
     DEVICE_ALREADY_REGISTERED(HttpStatus.CONFLICT, "이미 등록된 약통이 있습니다. 먼저 해제해주세요."),
     DEVICE_SERIAL_IN_USE(HttpStatus.CONFLICT, "이미 다른 복약자에게 등록된 약통입니다."),
+    /** 출고 약통 목록에 없는 시리얼이거나 비밀값이 틀림 (둘을 구분해서 알려 주지 않는다) */
+    DEVICE_CREDENTIALS_INVALID(HttpStatus.BAD_REQUEST, "시리얼번호 또는 비밀값이 올바르지 않습니다. 약통 하단 라벨을 확인해주세요."),
     DEVICE_AUTH_FAILED(HttpStatus.UNAUTHORIZED, "기기 인증에 실패했습니다."),
 
     // --- 약통 칸 배정 ---
