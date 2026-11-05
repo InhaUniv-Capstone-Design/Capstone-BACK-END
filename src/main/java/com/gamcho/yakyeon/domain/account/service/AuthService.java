@@ -17,8 +17,10 @@ import com.gamcho.yakyeon.domain.account.entity.Patient;
 import com.gamcho.yakyeon.domain.account.entity.TermsVersion;
 import com.gamcho.yakyeon.domain.account.entity.UserAgreement;
 import com.gamcho.yakyeon.domain.account.consent.AgreementRepository;
+import com.gamcho.yakyeon.domain.account.logic.LoginLockRules;
 import com.gamcho.yakyeon.domain.account.repository.AppUserRepository;
 import com.gamcho.yakyeon.domain.account.repository.AuthTokenRepository;
+import com.gamcho.yakyeon.domain.account.repository.LoginAttemptRepository;
 import com.gamcho.yakyeon.domain.account.repository.PatientRepository;
 import com.gamcho.yakyeon.domain.account.repository.TermsVersionRepository;
 import com.gamcho.yakyeon.domain.account.repository.UserAgreementRepository;
@@ -68,9 +70,23 @@ public class AuthService {
     private final PhoneEncryptor phoneEncryptor;
     private final PhoneHasher phoneHasher;
     private final SignupVerificationService signupVerificationService;
+    private final LoginAttemptRepository loginAttemptRepository;
 
     @Value("${jwt.refresh-token-expiration-seconds:1209600}")
     private long refreshTokenExpirationSeconds;
+
+    /** 로그인 연속 실패 잠금 (auth.login-lock.*). 끄려면 enabled=false */
+    @Value("${auth.login-lock.enabled:true}")
+    private boolean loginLockEnabled;
+
+    @Value("${auth.login-lock.max-failures:5}")
+    private int loginLockMaxFailures;
+
+    @Value("${auth.login-lock.minutes:15}")
+    private int loginLockMinutes;
+
+    /** 없는 아이디로 로그인할 때 비밀번호 비교 시간을 맞추려고 한 번 만들어 두는 가짜 해시 */
+    private volatile String dummyPasswordHash;
 
     // ==================== 회원가입 ====================
 
@@ -214,20 +230,48 @@ public class AuthService {
 
     /**
      * FR-AUTH-005~007: 로그인
-     * 실패 횟수 잠금 정책은 적용하지 않기로 함(단순 아이디/비밀번호 검증만 수행).
+     *
+     * 비밀번호를 연속으로 틀리면 계정을 잠근다(기본 5번 연속 실패 → 15분, auth.login-lock.* 로 바꾸거나 끌 수 있다).
+     * 이전에는 잠금 정책을 적용하지 않기로 했지만, 서버가 공개되면 비밀번호를 끝없이 시도할 수 있어서 넣었다.
+     *  - 잠긴 동안은 비밀번호가 맞아도 LOGIN_LOCKED로 거절한다. 비밀번호 확인 자체를 하지 않아서 잠금 중에는 맞는지 알아낼 수 없고,
+     *    실패 횟수도 늘지 않아 잠금이 길어지지 않는다.
+     *  - 실패가 잠금을 만드는 순간(마지막 실패)에도 LOGIN_LOCKED로 알려, 사용자가 왜 안 되는지 알 수 있게 한다.
+     *  - 없는 아이디도 비밀번호 비교와 같은 시간을 쓰게 해서, 응답 시간으로 아이디가 있는지 알아내지 못하게 한다.
+     *  - 실패 기록은 BusinessException이 나도 롤백되면 안 되어서 noRollbackFor가 필요하다(롤백되면 실패 횟수가 늘지 않는다).
      */
-    @Transactional
+    @Transactional(noRollbackFor = BusinessException.class)
     public LoginResponse login(LoginRequest request) {
-        AppUser user = appUserRepository.findByLoginIdAndDeletedAtIsNull(request.getLoginId())
-                .orElseThrow(() -> new BusinessException(ErrorCode.INVALID_CREDENTIALS));
+        AppUser user = appUserRepository.findByLoginIdAndDeletedAtIsNull(request.getLoginId()).orElse(null);
+        if (user == null) {
+            passwordEncoder.matches(request.getPassword(), dummyPasswordHash());
+            throw new BusinessException(ErrorCode.INVALID_CREDENTIALS);
+        }
+
+        if (loginLockEnabled && loginAttemptRepository.isLocked(user.getUserId())) {
+            throw new BusinessException(ErrorCode.LOGIN_LOCKED);
+        }
 
         if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
+            if (loginLockEnabled && loginAttemptRepository.recordFailure(user.getUserId(),
+                    LoginLockRules.maxFailures(loginLockMaxFailures), LoginLockRules.lockMinutes(loginLockMinutes))) {
+                throw new BusinessException(ErrorCode.LOGIN_LOCKED);
+            }
             throw new BusinessException(ErrorCode.INVALID_CREDENTIALS);
         }
 
         user.recordSuccessfulLogin();
 
         return issueTokens(user);
+    }
+
+    /** 실제 비밀번호 해시와 같은 방식(같은 비용)으로 만든 가짜 해시. 처음 쓸 때 한 번만 만든다 */
+    private String dummyPasswordHash() {
+        String hash = dummyPasswordHash;
+        if (hash == null) {
+            hash = passwordEncoder.encode("not-a-real-password-for-timing-only");
+            dummyPasswordHash = hash;
+        }
+        return hash;
     }
 
     /**

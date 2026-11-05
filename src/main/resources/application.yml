@@ -52,7 +52,15 @@ rate-limit:
 privacy:
   purge:
     enabled: true                  # false면 파기를 하지 않는다 (탈퇴해도 건강기록이 남는다)
+    dry-run: false                 # true면 지우지 않고 지울 건수만 로그에 남긴다 (처음 배포할 때 건수 확인용)
     patient-retention-days: 0      # 복약자 본인 탈퇴 후 삭제까지 (0 = 다음 점검 때 바로)
     guardian-retention-days: 30    # 대리인 탈퇴 후 계정 행 보관 (이 동안의 연동 기록이 아래 보관 기간의 시계가 된다)
     abandoned-patient-days: 30     # 관리하는 대리인이 모두 탈퇴한 앱 계정 없는 복약자의 기록 보관 (대리인 보관 일수를 넘지 못한다)
     batch-limit: 200               # 한 번에 정리하는 관리자 없는 복약자 수
+
+# 로그인 연속 실패 잠금 (비밀번호를 연속으로 틀리면 계정을 잠시 잠가서 비밀번호를 끝없이 시도하는 공격을 막는다)
+auth:
+  login-lock:
+    enabled: true      # false면 잠금을 끈다
+    max-failures: 5    # 이 횟수만큼 연속으로 틀리면 잠근다 (2~20)
+    minutes: 15        # 잠금 시간(분, 1~1440)

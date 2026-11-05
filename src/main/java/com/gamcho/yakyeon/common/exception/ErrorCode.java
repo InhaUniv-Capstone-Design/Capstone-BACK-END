@@ -21,6 +21,8 @@ public enum ErrorCode {
     // --- 로그인/토큰 (FR-AUTH-005~007) ---
     /** 아이디가 없거나 비밀번호가 틀렸거나 - 둘을 구분해서 알려주지 않는다 (계정 존재 여부 비노출) */
     INVALID_CREDENTIALS(HttpStatus.UNAUTHORIZED, "아이디 또는 비밀번호가 올바르지 않습니다."),
+    /** 비밀번호를 연속으로 틀려 계정이 잠시 잠김 (잠긴 동안은 비밀번호가 맞아도 거절) */
+    LOGIN_LOCKED(HttpStatus.TOO_MANY_REQUESTS, "로그인 시도가 너무 많아 잠시 잠겼습니다. 잠시 후 다시 시도해주세요."),
     INVALID_REFRESH_TOKEN(HttpStatus.UNAUTHORIZED, "유효하지 않거나 만료된 토큰입니다. 다시 로그인해주세요."),
     REFRESH_TOKEN_REUSED(HttpStatus.UNAUTHORIZED, "비정상적인 접근이 감지되어 모든 로그인이 종료되었습니다. 다시 로그인해주세요."),
 
