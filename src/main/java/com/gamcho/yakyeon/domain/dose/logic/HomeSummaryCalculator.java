@@ -7,7 +7,7 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * 오늘의 복약 현황 집계 (DB·스프링 없는 순수 로직). 홈 화면의 "복약 현황 2/3", 아침·점심·저녁 아이콘,
+ * 오늘의 복약 현황 집계 (DB·스프링 없는 순수 로직). 홈 화면의 "복약 현황 2/3", 아침·점심·저녁·취침 아이콘(항상 4개),
  * "다음 복약"이 모두 여기서 나온다.
  *
  * 시간대 아이콘의 상태 (그날 그 시간대의 예정들을 합쳐서 하나로):
@@ -18,7 +18,7 @@ import java.util.Optional;
  */
 public final class HomeSummaryCalculator {
 
-    public static final List<String> SLOTS = List.of("MORNING", "LUNCH", "DINNER");
+    public static final List<String> SLOTS = List.of("MORNING", "LUNCH", "DINNER", "BEDTIME");
 
     private HomeSummaryCalculator() {
     }

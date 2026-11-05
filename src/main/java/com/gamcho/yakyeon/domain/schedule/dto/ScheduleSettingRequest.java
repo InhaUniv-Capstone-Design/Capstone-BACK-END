@@ -20,7 +20,7 @@ public class ScheduleSettingRequest {
 
     @JsonProperty("settings")
     @NotNull(message = "복용 시각 목록을 입력해주세요.")
-    @Size(max = 3, message = "복용 시각은 아침·점심·저녁 최대 3개까지 설정할 수 있습니다.")
+    @Size(max = 4, message = "복용 시각은 아침·점심·저녁·취침 최대 4개까지 설정할 수 있습니다.")
     @Valid
     private List<Item> settings;
 
@@ -28,7 +28,7 @@ public class ScheduleSettingRequest {
     public static class Item {
 
         @JsonProperty("timing_slot")
-        @NotNull(message = "복용 시간대를 입력해주세요. (MORNING, LUNCH, DINNER)")
+        @NotNull(message = "복용 시간대를 입력해주세요. (MORNING, LUNCH, DINNER, BEDTIME)")
         private TimingSlot timingSlot;
 
         /** HH:mm (24시간). 예: 08:00 */

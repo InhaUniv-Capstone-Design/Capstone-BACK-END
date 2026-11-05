@@ -1,6 +1,7 @@
 package com.gamcho.yakyeon.domain.dose.logic;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
@@ -16,6 +17,9 @@ import java.util.List;
  *  - 그 시간대에 먹는 약이 하나라도 있어야 한다 (약이 없는 시간대의 예정은 만들지 않는다)
  *  - 약의 복용 기간 안의 날짜여야 한다 (시작일·종료일 당일 포함)
  *  - 약 또는 처방을 종료한 시각이 예정 시각보다 뒤여야 한다 (종료 이후의 예정에는 그 약이 빠진다)
+ *
+ * 마감은 예정 시각 + 마감 분이지만 같은 날 23:59:59를 넘지 않게 자른다. 아침·점심·저녁은 20:59 이전이라 잘리지 않고,
+ * 취침(최대 23:59)만 해당한다 (취침 22:00이면 마감 23:59:59). 자정을 넘는 예정은 만들지 않는다.
  */
 public final class DosePlanner {
 
@@ -32,6 +36,7 @@ public final class DosePlanner {
         List<PlannedDose> result = new ArrayList<>();
         for (int i = 0; i < days; i++) {
             LocalDate date = firstDay.plusDays(i);
+            OffsetDateTime endOfDay = ZonedDateTime.of(date, LocalTime.of(23, 59, 59), zone).toOffsetDateTime();
             for (SettingRef s : settings) {
                 OffsetDateTime scheduledAt = ZonedDateTime.of(date, s.doseTime(), zone).toOffsetDateTime();
                 if (prescriptionEndedAt != null && !prescriptionEndedAt.isAfter(scheduledAt)) {
@@ -42,9 +47,10 @@ public final class DosePlanner {
                                 && !date.isBefore(m.startDate()) && !date.isAfter(m.endDate())
                                 && (m.endedAt() == null || m.endedAt().isAfter(scheduledAt)));
                 if (hasItem) {
+                    OffsetDateTime closeAt = scheduledAt.plusMinutes(s.closeAfterMin());
                     result.add(new PlannedDose(s.slot(), date, s.settingId(), scheduledAt,
                             scheduledAt.plusMinutes(s.normalWindowMin()),
-                            scheduledAt.plusMinutes(s.closeAfterMin())));
+                            closeAt.isAfter(endOfDay) ? endOfDay : closeAt));
                 }
             }
         }

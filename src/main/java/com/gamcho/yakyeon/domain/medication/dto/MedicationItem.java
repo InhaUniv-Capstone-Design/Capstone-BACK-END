@@ -47,8 +47,8 @@ public class MedicationItem {
     private Boolean prn;
 
     @JsonProperty("times_per_day")
-    @Min(value = 1, message = "하루 복용 횟수는 1~3회입니다.")
-    @Max(value = 3, message = "하루 복용 횟수는 1~3회입니다.")
+    @Min(value = 1, message = "하루 복용 횟수는 1~4회입니다.")
+    @Max(value = 4, message = "하루 복용 횟수는 1~4회입니다.")
     private Short timesPerDay;
 
     @JsonProperty("timing_slots")
