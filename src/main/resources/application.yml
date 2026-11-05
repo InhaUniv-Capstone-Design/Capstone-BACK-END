@@ -47,3 +47,12 @@ sms:
 # 공개 API의 접속 주소별 호출 제한 (시험할 때만 false)
 rate-limit:
   enabled: true
+
+# 탈퇴 데이터 파기 (탈퇴한 사람의 건강기록을 보관 기간 뒤에 실제로 삭제한다. 10분마다 점검)
+privacy:
+  purge:
+    enabled: true                  # false면 파기를 하지 않는다 (탈퇴해도 건강기록이 남는다)
+    patient-retention-days: 0      # 복약자 본인 탈퇴 후 삭제까지 (0 = 다음 점검 때 바로)
+    guardian-retention-days: 30    # 대리인 탈퇴 후 계정 행 보관 (이 동안의 연동 기록이 아래 보관 기간의 시계가 된다)
+    abandoned-patient-days: 30     # 관리하는 대리인이 모두 탈퇴한 앱 계정 없는 복약자의 기록 보관 (대리인 보관 일수를 넘지 못한다)
+    batch-limit: 200               # 한 번에 정리하는 관리자 없는 복약자 수
