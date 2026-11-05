@@ -143,8 +143,9 @@ public class ScheduleSettingService {
                     .prescriptionId(prescriptionId)
                     .timingSlot(e.getKey())
                     .doseTime(e.getValue())
-                    .normalWindowMin((short) ScheduleRules.NORMAL_WINDOW_MIN)
-                    .closeAfterMin((short) ScheduleRules.CLOSE_AFTER_MIN)
+                    // 늦은 취침은 마감을 같은 날 23:59:59에서 자르고 정상 인정 시간도 그 안쪽으로 줄인다 (ScheduleRules)
+                    .normalWindowMin((short) ScheduleRules.normalWindowMin(e.getValue()))
+                    .closeAfterMin((short) ScheduleRules.closeAfterMin(e.getValue()))
                     .effectiveFrom(at)
                     .build());
         }
