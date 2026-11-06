@@ -26,7 +26,22 @@ public record OcrResult(
             Integer totalDays,
             boolean prn,
             PatientMedication.MealRelation mealRelation,
-            Short mealOffsetMin
+            Short mealOffsetMin,
+            List<String> timingSlots
     ) {
+
+        /**
+         * 복용 시간대(MORNING, LUNCH, DINNER, BEDTIME)는 처방전에 아침·점심·저녁 칸이 있는 양식에서만 읽을 수 있다.
+         * 읽지 못했으면 빈 목록이고, 프론트가 사용자에게 고르게 한다.
+         */
+        public Item {
+            timingSlots = timingSlots == null ? List.of() : List.copyOf(timingSlots);
+        }
+
+        /** 복용 시간대를 읽지 못한 경우(시간대 칸이 없는 양식) */
+        public Item(String drugName, BigDecimal dosePerIntake, Short timesPerDay, Integer totalDays, boolean prn,
+                    PatientMedication.MealRelation mealRelation, Short mealOffsetMin) {
+            this(drugName, dosePerIntake, timesPerDay, totalDays, prn, mealRelation, mealOffsetMin, List.of());
+        }
     }
 }

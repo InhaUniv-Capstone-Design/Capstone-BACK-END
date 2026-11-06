@@ -61,6 +61,8 @@ public enum ErrorCode {
     INVALID_IMAGE(HttpStatus.BAD_REQUEST, "올바른 이미지 파일이 아닙니다. JPEG 또는 PNG 이미지를 올려주세요."),
     /** 413. 스프링 버전에 따라 상수 이름이 다르므로(PAYLOAD_TOO_LARGE / CONTENT_TOO_LARGE) 숫자로 만든다 */
     IMAGE_TOO_LARGE(HttpStatus.valueOf(413), "이미지가 너무 큽니다. 8MB 이하로 올려주세요."),
+    /** 처방전 인식 엔진(외부 OCR)을 지금 쓸 수 없음: 연결 실패, 시간 초과, 호출 한도, 엔진 오류 */
+    OCR_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "처방전 인식을 지금 사용할 수 없습니다. 잠시 후 다시 시도하거나 약을 직접 입력해주세요."),
     /** 약 항목의 값이 규칙에 맞지 않음. 어느 약의 어떤 필드인지는 상황별 메시지로 알려준다 */
     INVALID_MEDICATION(HttpStatus.BAD_REQUEST, "약물 정보가 올바르지 않습니다."),
 

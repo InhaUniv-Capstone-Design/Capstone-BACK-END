@@ -13,6 +13,8 @@ import java.util.List;
  * - matched_drug_id: 이름이 약물 DB의 제품 하나와 정확히 일치할 때만 채워진다.
  *   같은 이름의 제품이 업체별로 여러 개면 자동으로 정할 수 없어 비워 두고, 사용자가 candidates에서 고르게 한다.
  * - candidates: 비슷한 이름의 제품 후보 (최대 3개). 글자를 잘못 읽은 경우 사용자가 올바른 약을 고르는 용도
+ * - timing_slots: 처방전에 아침·점심·저녁 칸이 있으면 약을 먹는 시간대(MORNING, LUNCH, DINNER, BEDTIME).
+ *   칸이 없는 양식이거나 읽지 못했으면 빈 배열이다(이때는 사용자가 고른다). 있으면 times_per_day와 개수가 같다.
  * 읽지 못한 항목은 null이다.
  */
 public record RecognizedMedication(
@@ -24,6 +26,7 @@ public record RecognizedMedication(
         @JsonProperty("total_days") Integer totalDays,
         @JsonProperty("is_prn") boolean prn,
         @JsonProperty("meal_relation") String mealRelation,
-        @JsonProperty("meal_offset_min") Short mealOffsetMin
+        @JsonProperty("meal_offset_min") Short mealOffsetMin,
+        @JsonProperty("timing_slots") List<String> timingSlots
 ) {
 }
