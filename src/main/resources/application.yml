@@ -64,3 +64,15 @@ auth:
     enabled: true      # false면 잠금을 끈다
     max-failures: 5    # 이 횟수만큼 연속으로 틀리면 잠근다 (2~20)
     minutes: 15        # 잠금 시간(분, 1~1440)
+
+# 처방전 글자 인식(OCR). 어떤 엔진을 쓸지는 환경변수 OCR_PROVIDER(mock 또는 clova)로 명시해야 한다(없으면 서버가 시작하지 않는다).
+# clova일 때: CLOVA_OCR_INVOKE_URL(콘솔 API Gateway 연동의 주소), CLOVA_OCR_SECRET_KEY(같은 화면에서 생성한 키)가 필요하다.
+ocr:
+  clova:
+    invoke-url: ${CLOVA_OCR_INVOKE_URL:}
+    secret-key: ${CLOVA_OCR_SECRET_KEY:}
+    table-detection: false         # true면 표 인식을 함께 요청한다 (콘솔 도메인의 '표 추출 여부'를 켜 둔 경우에만. 꺼져 있으면 오류 0028)
+    connect-timeout-ms: 3000
+    read-timeout-ms: 20000
+    max-concurrent-calls: 2        # 네이버가 권장하는 호출 성능은 계정당 최대 1 tps다. 넘으면 오류 0025(호출 속도 제한)가 올 수 있다
+    daily-call-limit: 100          # 하루 호출 한도(서버 메모리 기준, 재시작하면 초기화). 무료 제공은 월 100건이라 시험 때는 더 낮춰도 된다

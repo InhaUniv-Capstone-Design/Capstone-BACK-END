@@ -2,6 +2,7 @@ package com.gamcho.yakyeon.domain.medication.service;
 
 import com.gamcho.yakyeon.common.exception.BusinessException;
 import com.gamcho.yakyeon.common.exception.ErrorCode;
+import com.gamcho.yakyeon.common.ratelimit.FixedWindowCounter;
 import com.gamcho.yakyeon.domain.account.access.AccessAction;
 import com.gamcho.yakyeon.domain.account.access.PatientAccessGuard;
 import com.gamcho.yakyeon.domain.account.consent.ConsentGuard;
@@ -9,35 +10,47 @@ import com.gamcho.yakyeon.domain.drug.dto.DrugSuggestionResponse;
 import com.gamcho.yakyeon.domain.drug.service.DrugService;
 import com.gamcho.yakyeon.domain.medication.dto.OcrRecognizeResponse;
 import com.gamcho.yakyeon.domain.medication.dto.RecognizedMedication;
+import com.gamcho.yakyeon.domain.medication.ocr.DrugNameMatcher;
 import com.gamcho.yakyeon.domain.medication.ocr.ImageSignature;
 import com.gamcho.yakyeon.domain.medication.ocr.OcrResult;
+import com.gamcho.yakyeon.domain.medication.ocr.OcrUnavailableException;
 import com.gamcho.yakyeon.domain.medication.ocr.PrescriptionOcrClient;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 
 /**
  * 처방전 이미지 OCR (FR-ADD). 이미지를 읽어 약 목록 초안을 돌려줄 뿐 아무것도 저장하지 않는다 -
  * 사용자가 초안을 확인한 뒤 처방 등록 API를 따로 호출한다. 이미지도 저장하지 않는다.
+ *
+ * 외부 OCR(CLOVA)은 호출마다 비용이 들고 월 무료 제공량이 정해져 있어서, 계정당 시간당 호출 수를 제한한다.
+ * 엔진을 쓸 수 없으면(연결 실패, 시간 초과, 호출 한도, 엔진 오류) 503 OCR_UNAVAILABLE이다. 이때 이미지 내용은 로그에 남기지 않고 원인만 남긴다.
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class PrescriptionOcrService {
 
     private static final long MAX_IMAGE_BYTES = 8L * 1024 * 1024;
     private static final int CANDIDATE_LIMIT = 3;
+    /** 자동으로 약을 정할 수 있는지 판단하려고 DB에서 가져오는 후보 수 (사용자에게 보여 주는 것은 CANDIDATE_LIMIT개) */
+    private static final int MATCH_POOL_LIMIT = 10;
     private static final int MAX_LOOKUP_LENGTH = 50;
+    private static final int RECOGNIZE_ATTEMPTS_PER_HOUR = 20;
 
     private final PatientAccessGuard patientAccessGuard;
     private final ConsentGuard consentGuard;
     private final PrescriptionOcrClient ocrClient;
     private final DrugService drugService;
     private final TransactionTemplate transactionTemplate;
+    private final FixedWindowCounter recognizeLimiter = new FixedWindowCounter(20_000);
 
     /**
      * 접근 권한: 처방 등록으로 이어지는 흐름이라 처방 등록과 같은 쓰기 권한(CREATE)을 요구한다.
@@ -53,8 +66,18 @@ public class PrescriptionOcrService {
         // 처방전을 읽는 것도 약 등록 흐름이라 같은 동의(MEDICATION)가 필요하다
         consentGuard.requireMedication(userId);
 
+        if (!recognizeLimiter.tryAcquire("ocr|" + userId, RECOGNIZE_ATTEMPTS_PER_HOUR, 3600, Instant.now().getEpochSecond())) {
+            throw new BusinessException(ErrorCode.RATE_LIMITED);
+        }
+
         byte[] bytes = readAndValidate(image);
-        OcrResult result = ocrClient.recognize(bytes);
+        OcrResult result;
+        try {
+            result = ocrClient.recognize(bytes);
+        } catch (OcrUnavailableException e) {
+            log.warn("처방전 인식을 쓸 수 없습니다: {}", e.getReason());
+            throw new BusinessException(ErrorCode.OCR_UNAVAILABLE);
+        }
 
         List<RecognizedMedication> recognized = result.items().stream().map(this::toResponse).toList();
         return new OcrRecognizeResponse(result.hospitalName(), result.pharmacyName(), result.prescribedDate(), recognized);
@@ -84,59 +107,57 @@ public class PrescriptionOcrService {
 
     /** OCR이 읽은 약 한 줄에 약물 DB 매칭 결과(자동 매칭 id, 후보)를 붙인다 */
     private RecognizedMedication toResponse(OcrResult.Item item) {
-        List<DrugSuggestionResponse> candidates = findCandidates(item.drugName());
+        List<DrugSuggestionResponse> pool = findPool(item.drugName());
+        Long matchedId = DrugNameMatcher.matchId(item.drugName(),
+                pool.stream().map(c -> new DrugNameMatcher.Candidate(c.drugId(), c.productName())).toList());
         return new RecognizedMedication(
                 item.drugName(),
-                exactMatchId(item.drugName(), candidates),
-                candidates,
+                matchedId,
+                topCandidates(pool, matchedId),
                 item.dosePerIntake(),
                 item.timesPerDay(),
                 item.totalDays(),
                 item.prn(),
                 item.mealRelation() == null ? null : item.mealRelation().name(),
-                item.mealOffsetMin());
+                item.mealOffsetMin(),
+                item.timingSlots());
     }
 
     /**
-     * 읽은 이름으로 약물 DB를 검색해 후보를 찾는다.
-     * 결과가 없으면 숫자(함량) 앞까지만 잘라 다시 찾는다 - 함량을 잘못 읽은 경우에도 같은 제품군이 후보로 나오게.
+     * 읽은 이름으로 약물 DB를 검색해 후보를 찾는다. 검색어는 읽은 이름 그대로, 첫 숫자(함량) 앞까지, 괄호를 뺀 이름 순서로 시도하고
+     * 결과가 나오면 멈춘다 - 함량이나 성분명 병기가 DB 표기와 달라도 같은 제품군이 후보로 나오게.
      * 자동완성과 같은 검색(부분 일치, 입력 이스케이프, 길이 제한)을 재사용한다.
      */
-    private List<DrugSuggestionResponse> findCandidates(String rawName) {
-        String name = squeeze(rawName);
-        if (name.length() > MAX_LOOKUP_LENGTH) {
-            name = name.substring(0, MAX_LOOKUP_LENGTH);   // OCR이 이상하게 길게 읽어도 검색 제한(50자)에 걸려 실패하지 않게
-        }
-        List<DrugSuggestionResponse> found = drugService.autocomplete(name, CANDIDATE_LIMIT);
-        if (found.isEmpty()) {
-            String withoutStrength = name.replaceAll("[0-9].*$", "").trim();
-            if (!withoutStrength.equals(name)) {
-                found = drugService.autocomplete(withoutStrength, CANDIDATE_LIMIT);
+    private List<DrugSuggestionResponse> findPool(String rawName) {
+        for (String term : DrugNameMatcher.searchTerms(rawName, MAX_LOOKUP_LENGTH)) {
+            List<DrugSuggestionResponse> found = drugService.autocomplete(term, MATCH_POOL_LIMIT);
+            if (!found.isEmpty()) {
+                return found;
             }
         }
-        return found;
+        return List.of();
     }
 
     /**
-     * 후보 중 읽은 이름과 정확히 일치하는 제품이 "하나뿐일 때만" 그 id를 돌려준다.
+     * 사용자에게 보여 줄 후보 (최대 CANDIDATE_LIMIT개). 자동으로 정해진 제품이 있으면 맨 앞에 둔다.
+     * 자동 선택은 "상품명이 같고 함량이 맞는 제품이 정확히 하나일 때만" 이뤄진다(DrugNameMatcher).
      * 같은 이름의 제품이 업체별로 여러 개면 어느 것인지 알 수 없어 자동으로 정하지 않는다 (잘못 정하면
      * 다른 약으로 병용금기 검사가 돌아가 위험하다).
      */
-    private Long exactMatchId(String rawName, List<DrugSuggestionResponse> candidates) {
-        String target = normalize(rawName);
-        List<DrugSuggestionResponse> exact = candidates.stream()
-                .filter(c -> normalize(c.productName()).equals(target))
-                .toList();
-        return exact.size() == 1 ? exact.get(0).drugId() : null;
+    private static List<DrugSuggestionResponse> topCandidates(List<DrugSuggestionResponse> pool, Long matchedId) {
+        List<DrugSuggestionResponse> result = new ArrayList<>();
+        if (matchedId != null) {
+            pool.stream().filter(c -> matchedId.equals(c.drugId())).findFirst().ifPresent(result::add);
+        }
+        for (DrugSuggestionResponse c : pool) {
+            if (result.size() >= CANDIDATE_LIMIT) {
+                break;
+            }
+            if (!result.contains(c)) {
+                result.add(c);
+            }
+        }
+        return result;
     }
 
-    /** 앞뒤 공백 제거, 연속 공백을 하나로 */
-    private static String squeeze(String s) {
-        return s == null ? "" : s.trim().replaceAll("\\s+", " ");
-    }
-
-    /** 비교용: 공백을 모두 없애고 소문자로 */
-    private static String normalize(String s) {
-        return s == null ? "" : s.replaceAll("\\s+", "").toLowerCase(Locale.ROOT);
-    }
 }

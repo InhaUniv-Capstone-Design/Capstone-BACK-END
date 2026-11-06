@@ -32,9 +32,9 @@ public class MockPrescriptionOcrClient implements PrescriptionOcrClient {
                 ApiTime.today(),
                 List.of(
                         new OcrResult.Item("메트포르민정500mg", BigDecimal.ONE, (short) 2, 30, false,
-                                PatientMedication.MealRelation.AFTER_MEAL, (short) 30),
+                                PatientMedication.MealRelation.AFTER_MEAL, (short) 30, List.of("MORNING", "DINNER")),
                         new OcrResult.Item("아토르바스타틴정10mg", BigDecimal.ONE, (short) 1, 30, false,
-                                null, null),
+                                null, null, List.of("DINNER")),
                         new OcrResult.Item("소화제", null, null, 7, true, null, null)));
     }
 }
