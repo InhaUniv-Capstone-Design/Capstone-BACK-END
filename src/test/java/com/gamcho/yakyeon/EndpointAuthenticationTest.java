@@ -23,7 +23,7 @@ import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandl
 
 /**
  * 로그인 없이 부를 수 있는 API가 의도한 것뿐인지 확인한다. 서버의 모든 API를 로그인 정보 없이 불러 보고,
- * 아래 "공개 API" 12개를 뺀 나머지가 모두 401(로그인 필요)인지 본다. 새 API를 만들고 보안 설정을 실수로 열어 두거나
+ * 아래 "공개 API" 14개를 뺀 나머지가 모두 401(로그인 필요)인지 본다. 새 API를 만들고 보안 설정을 실수로 열어 두거나
  * 공개 목록에 없는 API를 열면 이 테스트가 실패한다. 공개 API를 일부러 늘릴 때는 SecurityConfig와 이 목록을 함께 고친다.
  * (로그인 정보 없이 보낸 요청은 보안 필터에서 거절되어 실제 처리가 일어나지 않는다.)
  */
@@ -39,6 +39,8 @@ class EndpointAuthenticationTest {
             "GET /auth/check-id",
             "POST /auth/phone-verifications",
             "POST /auth/phone-verifications/{verificationId}/confirm",
+            "POST /auth/find-id",
+            "POST /auth/password-reset",
             "GET /terms",
             "POST /revocations/request",
             "POST /revocations/confirm",
@@ -57,7 +59,7 @@ class EndpointAuthenticationTest {
     private RequestMappingHandlerMapping handlerMapping;
 
     @Test
-    @DisplayName("공개 API 12개를 뺀 모든 API는 로그인 정보 없이 부르면 401이다")
+    @DisplayName("공개 API 14개를 뺀 모든 API는 로그인 정보 없이 부르면 401이다")
     void everythingExceptThePublicEndpointsRequiresLogin() throws Exception {
         MockMvc mockMvc = MockMvcBuilders.webAppContextSetup(context).addFilters(springSecurityFilterChain).build();
 

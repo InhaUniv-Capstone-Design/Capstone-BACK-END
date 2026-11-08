@@ -12,6 +12,8 @@ public enum ErrorCode {
     PASSWORD_MISMATCH(HttpStatus.BAD_REQUEST, "비밀번호와 비밀번호 확인이 일치하지 않습니다."),
     INVALID_ACCOUNT_TYPE(HttpStatus.BAD_REQUEST, "계정 유형은 PATIENT 또는 GUARDIAN만 가능합니다."),
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 계정입니다."),
+    /** 아이디 찾기·비밀번호 재설정에서 입력한 정보와 맞는 계정이 없음 (없는 아이디, 다른 번호, 다른 이름을 구분하지 않는다) */
+    ACCOUNT_NOT_FOUND(HttpStatus.NOT_FOUND, "입력하신 정보와 일치하는 계정이 없습니다."),
 
     // --- 약관 동의 (FR-AUTH-008) ---
     REQUIRED_TERMS_NOT_AGREED(HttpStatus.BAD_REQUEST, "필수 약관에 모두 동의해야 가입할 수 있습니다."),
