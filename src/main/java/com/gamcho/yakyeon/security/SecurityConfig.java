@@ -17,7 +17,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import java.util.List;
 
 /**
- * 공개 엔드포인트(signup/check-id/login/refresh/logout, 가입용 문자 인증, GET /terms, POST /revocations/*)만 permitAll, 나머지는 인증 필요.
+ * 공개 엔드포인트(signup/check-id/login/refresh/logout, 가입용 문자 인증, 아이디 찾기·비밀번호 재설정, GET /terms, POST /revocations/*)만 permitAll, 나머지는 인증 필요.
  * httpBasic/formLogin을 꺼서 기본 AuthenticationEntryPoint가 없어졌던 걸
  * JwtAuthenticationEntryPoint로 직접 등록해서, 인증 안 된 요청이
  * 403(빈 바디) 대신 401 + 공통 에러 포맷으로 나가게 한다.
@@ -48,6 +48,9 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/auth/check-id").permitAll()
                         // 회원가입용 문자 인증 - 아직 계정이 없으므로 로그인 없이 호출한다
                         .requestMatchers(HttpMethod.POST, "/auth/phone-verifications", "/auth/phone-verifications/*/confirm").permitAll()
+                        // 아이디 찾기·비밀번호 재설정 - 로그인할 수 없는 사람이 쓰므로 공개. 대신 가입용 문자 인증의 증표(verification_token)를
+                        // 반드시 요구해서 "그 번호가 지금 내 손에 있다"를 확인한다 (AccountRecoveryService)
+                        .requestMatchers(HttpMethod.POST, "/auth/find-id", "/auth/password-reset").permitAll()
                         // 약관 본문 조회 - 회원가입 화면에서 로그인 전에 호출해야 하므로 공개
                         .requestMatchers(HttpMethod.GET, "/terms").permitAll()
                         // 문자 인증 철회 - 앱 계정이 없는 복약자는 로그인할 수 없으므로 공개
