@@ -1,6 +1,8 @@
 package com.gamcho.yakyeon.domain.medication.ocr.clova;
 
 import com.gamcho.yakyeon.domain.medication.ocr.PrescriptionOcrClient;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
@@ -18,6 +20,8 @@ import java.time.Duration;
 @Configuration
 public class ClovaOcrConfig {
 
+    private static final Logger log = LoggerFactory.getLogger(ClovaOcrConfig.class);
+
     @Bean
     @ConditionalOnProperty(name = "ocr.provider", havingValue = "clova")
     public PrescriptionOcrClient clovaPrescriptionOcrClient(
@@ -32,6 +36,9 @@ public class ClovaOcrConfig {
             throw new IllegalStateException(
                     "ocr.provider=clova 로 쓰려면 환경변수 CLOVA_OCR_INVOKE_URL과 CLOVA_OCR_SECRET_KEY가 필요합니다.");
         }
+        // 어느 엔진으로 돌고 있는지 서버 로그만으로 알 수 있게 (키와 주소는 남기지 않는다)
+        log.info("처방전 인식 엔진: CLOVA OCR (표 인식={}, 연결 제한 {}ms, 읽기 제한 {}ms, 동시 호출 {}, 하루 한도 {})",
+                tableDetection, connectTimeoutMs, readTimeoutMs, maxConcurrentCalls, dailyCallLimit);
         return new ClovaPrescriptionOcrClient(new ClovaOcrHttpClient(invokeUrl.trim(), secretKey.trim(), tableDetection,
                 Duration.ofMillis(connectTimeoutMs), Duration.ofMillis(readTimeoutMs), maxConcurrentCalls, dailyCallLimit));
     }

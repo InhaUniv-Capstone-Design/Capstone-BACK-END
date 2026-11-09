@@ -2,6 +2,9 @@ package com.gamcho.yakyeon.domain.medication.ocr;
 
 import com.gamcho.yakyeon.common.util.ApiTime;
 import com.gamcho.yakyeon.domain.medication.entity.PatientMedication;
+import jakarta.annotation.PostConstruct;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
@@ -23,6 +26,14 @@ import java.util.List;
 @Component
 @ConditionalOnProperty(name = "ocr.provider", havingValue = "mock")
 public class MockPrescriptionOcrClient implements PrescriptionOcrClient {
+
+    private static final Logger log = LoggerFactory.getLogger(MockPrescriptionOcrClient.class);
+
+    /** 배포 서버가 가짜 인식으로 돌고 있는지 로그로 바로 알 수 있게 한다. 이 응답은 항상 병원 "Seoul Hospital", 약국 "Central Pharmacy", 약 3개다 */
+    @PostConstruct
+    void announce() {
+        log.warn("처방전 인식 엔진: Mock (사진과 상관없이 같은 결과를 돌려주는 가짜입니다. 실제 인식은 OCR_PROVIDER=clova)");
+    }
 
     @Override
     public OcrResult recognize(byte[] image) {

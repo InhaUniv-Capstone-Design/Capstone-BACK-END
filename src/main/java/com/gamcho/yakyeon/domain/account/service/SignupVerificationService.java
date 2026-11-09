@@ -9,6 +9,7 @@ import com.gamcho.yakyeon.common.util.PhoneNumbers;
 import com.gamcho.yakyeon.domain.account.dto.SignupPhoneConfirmResponse;
 import com.gamcho.yakyeon.domain.account.dto.SignupPhoneSendResponse;
 import com.gamcho.yakyeon.domain.account.entity.PhoneVerification;
+import com.gamcho.yakyeon.domain.account.logic.OctomoCheckThrottle;
 import com.gamcho.yakyeon.domain.account.logic.VerificationWindow;
 import com.gamcho.yakyeon.domain.account.repository.PhoneVerificationRepository;
 import com.gamcho.yakyeon.security.PhoneHasher;
@@ -48,6 +49,7 @@ public class SignupVerificationService {
     private static final long CODE_TTL_SECONDS = 300;      // 인증번호 유효시간 5분
     private static final long PROOF_TTL_SECONDS = 1800;    // 인증 완료 후 가입을 마쳐야 하는 시간 30분
     private static final int MAX_REQUESTS_PER_HOUR = 5;    // 같은 번호로 1시간에 발송 가능한 최대 건수
+    private static final long MIN_OCTOMO_CHECK_INTERVAL_MILLIS = 1500;   // 같은 인증에 OCTOMO를 다시 묻기까지 최소 간격 (앱은 2초 간격으로 확인한다)
 
     private final PhoneVerificationRepository phoneVerificationRepository;
     private final PhoneHasher phoneHasher;
@@ -57,6 +59,8 @@ public class SignupVerificationService {
     private final SignupProofSigner signupProofSigner;
 
     private final SecureRandom secureRandom = new SecureRandom();
+    private final OctomoCheckThrottle octomoCheckThrottle =
+            new OctomoCheckThrottle(MIN_OCTOMO_CHECK_INTERVAL_MILLIS, CODE_TTL_SECONDS * 1000);
 
     /**
      * 인증 문자 발송. 이미 가입된 번호인지는 여기서 알려주지 않는다 - 인증번호를 받은 번호의 주인만
@@ -126,19 +130,28 @@ public class SignupVerificationService {
             throw new BusinessException(ErrorCode.VERIFICATION_ATTEMPTS_EXCEEDED);
         }
 
-        verification.increaseAttempt();
-
         // 해시 문자열 비교도 일정 시간에 끝나는 방식으로 (비교 시간 차이로 값을 추측하는 공격 방지)
         boolean match = MessageDigest.isEqual(
                 tokenHasher.sha256Hex(code).getBytes(StandardCharsets.UTF_8),
                 verification.getCodeHash().getBytes(StandardCharsets.UTF_8));
+        // 시도 횟수는 "인증번호가 틀렸을 때만" 센다. 인증번호를 직접 입력하는 방식(mock, 문자 발송)에서는 이것이 맞히기 시도를 막는
+        // 장치이고, OCTOMO 방식에서는 앱이 서버가 알려 준 인증번호를 그대로 보내므로 틀릴 일이 없다.
         if (!match) {
+            verification.increaseAttempt();
             return new SignupPhoneConfirmResponse(false, null, null);
         }
 
         OctomoClient octomo = octomoProvider.getIfAvailable();
-        if (octomo != null && !messageArrived(octomo, verification, code, rawPhone)) {
-            return new SignupPhoneConfirmResponse(false, null, null);
+        if (octomo != null) {
+            // OCTOMO 방식: 통과 여부는 "그 번호에서 문자가 왔는가"로 정해지고 인증번호를 맞히는 게 아니다. 그래서 문자를 기다리며
+            // 앱이 반복해서 보내는 확인은 시도 횟수로 세지 않는다(세면 2초마다 확인하는 앱이 30초 만에 10회를 채워 "횟수 초과"가 된다).
+            // 대신 OCTOMO 호출이 폭주하지 않게, 같은 인증은 1.5초에 한 번만 OCTOMO에 묻고 그보다 잦은 확인은 "아직"이라고 답한다.
+            // 인증번호는 5분 뒤 만료되므로 이 반복 확인도 그 안으로 한정된다.
+            if (octomoCheckThrottle.tooSoon(verificationId, System.currentTimeMillis())
+                    || !messageArrived(octomo, verification, code, rawPhone)) {
+                return new SignupPhoneConfirmResponse(false, null, null);
+            }
+            octomoCheckThrottle.forget(verificationId);
         }
 
         verification.markVerified();

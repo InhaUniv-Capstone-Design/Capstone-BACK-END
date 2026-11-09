@@ -53,7 +53,9 @@ public class AuthController {
     }
 
     /** 인증번호 입력 확인. 성공하면 가입 요청에 같이 보낼 verification_token을 돌려준다 */
-    @RateLimit(name = "signup-phone-confirm", limit = 120, windowSeconds = 3600)
+    // 앱이 문자를 기다리며 2초 간격으로 확인을 반복해서 인증 한 번에 최대 150건까지 온다(5분). 접속 주소별 한도라 API Gateway 뒤에서는
+    // 모든 사용자가 함께 쓰므로 넉넉히 둔다. 인증 한 건의 반복은 서버가 따로 막는다(OCTOMO 1.5초 간격, 인증번호 5분 만료).
+    @RateLimit(name = "signup-phone-confirm", limit = 1200, windowSeconds = 3600)
     @PostMapping("/phone-verifications/{verificationId}/confirm")
     public ResponseEntity<SignupPhoneConfirmResponse> confirmSignupCode(
             @PathVariable("verificationId") Long verificationId,
