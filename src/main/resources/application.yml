@@ -76,3 +76,14 @@ ocr:
     read-timeout-ms: 20000
     max-concurrent-calls: 2        # 네이버가 권장하는 호출 성능은 계정당 최대 1 tps다. 넘으면 오류 0025(호출 속도 제한)가 올 수 있다
     daily-call-limit: 100          # 하루 호출 한도(서버 메모리 기준, 재시작하면 초기화). 무료 제공은 월 100건이라 시험 때는 더 낮춰도 된다
+
+# 푸시 알림 발송. 어떤 발송기를 쓸지는 환경변수 PUSH_PROVIDER(mock 또는 fcm)로 명시해야 한다(없으면 서버가 시작하지 않는다).
+# fcm일 때: FCM_SERVICE_ACCOUNT_FILE(Firebase 서비스 계정 키 파일 경로, 서버에서 권장) 또는 FCM_SERVICE_ACCOUNT_JSON이 필요하다.
+push:
+  fcm:
+    project-id: ${FCM_PROJECT_ID:}                       # 비워 두면 서비스 계정 키의 project_id를 쓴다
+    service-account-file: ${FCM_SERVICE_ACCOUNT_FILE:}
+    service-account-json: ${FCM_SERVICE_ACCOUNT_JSON:}
+    ttl-seconds: 3600              # 기기가 꺼져 있을 때 FCM이 푸시를 보관하는 시간 (60초 ~ 4주). 오래된 복약 알림은 혼란스러워서 짧게
+    connect-timeout-ms: 3000
+    read-timeout-ms: 10000
