@@ -70,6 +70,7 @@ public class PrescriptionOcrService {
             throw new BusinessException(ErrorCode.RATE_LIMITED);
         }
 
+        long started = System.nanoTime();
         byte[] bytes = readAndValidate(image);
         OcrResult result;
         try {
@@ -80,6 +81,11 @@ public class PrescriptionOcrService {
         }
 
         List<RecognizedMedication> recognized = result.items().stream().map(this::toResponse).toList();
+        // 약물 DB 매칭이 약을 버리지는 않는다: 매칭이 안 된 약도 그대로 초안에 남고(matched_drug_id만 null), recognized가 비는 것은 처방전에서 약을 못 찾았을 때뿐이다
+        log.info("처방전 인식 응답: 약={}, 자동매칭={}, 후보없음={}, 전체 {}ms",
+                recognized.size(), recognized.stream().filter(r -> r.matchedDrugId() != null).count(),
+                recognized.stream().filter(r -> r.candidates() == null || r.candidates().isEmpty()).count(),
+                (System.nanoTime() - started) / 1_000_000);
         return new OcrRecognizeResponse(result.hospitalName(), result.pharmacyName(), result.prescribedDate(), recognized);
     }
 

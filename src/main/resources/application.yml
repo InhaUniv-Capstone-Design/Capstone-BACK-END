@@ -38,7 +38,7 @@ octomo:
   api-key: ${OCTOMO_API_KEY:}              # 옥토모 마이페이지의 API Key. 파일에 적지 말고 환경변수로만 넣는다
   base-url: https://api.octoverse.kr/octomo/v1
   representative-number: "16663538"        # 사용자가 문자를 보낼 대표번호(1666-3538)
-  daily-call-limit: 300                    # 하루 호출 한도. 무료 플랜 월 10,000건을 넘지 않게 한다 (0이면 제한 없음)
+  daily-call-limit: ${OCTOMO_DAILY_CALL_LIMIT:300}        # 하루 호출 한도. 무료 플랜 월 10,000건을 넘지 않게 한다 (0이면 제한 없음)
 
 # 문자 발송 방식(옛 보호자 연동 방식용). 실제 서버에서는 disabled로 둬서 인증번호를 로그에 남기는 mock을 쓰지 않는다
 sms:
@@ -73,7 +73,7 @@ ocr:
     secret-key: ${CLOVA_OCR_SECRET_KEY:}
     table-detection: false         # true면 표 인식을 함께 요청한다 (콘솔 도메인의 '표 추출 여부'를 켜 둔 경우에만. 꺼져 있으면 오류 0028)
     connect-timeout-ms: 3000
-    read-timeout-ms: 20000
+    read-timeout-ms: 12000
     max-concurrent-calls: 2        # 네이버가 권장하는 호출 성능은 계정당 최대 1 tps다. 넘으면 오류 0025(호출 속도 제한)가 올 수 있다
     daily-call-limit: 100          # 하루 호출 한도(서버 메모리 기준, 재시작하면 초기화). 무료 제공은 월 100건이라 시험 때는 더 낮춰도 된다
 

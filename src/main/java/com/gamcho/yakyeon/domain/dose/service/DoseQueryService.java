@@ -11,6 +11,7 @@ import com.gamcho.yakyeon.domain.dose.entity.DecisionSource;
 import com.gamcho.yakyeon.domain.dose.entity.DoseStatus;
 import com.gamcho.yakyeon.domain.dose.logic.DoseBrief;
 import com.gamcho.yakyeon.domain.dose.logic.HomeSummaryCalculator;
+import com.gamcho.yakyeon.domain.dose.logic.HomeSummaryLists;
 import com.gamcho.yakyeon.domain.dose.repository.DoseQueryRepository;
 import com.gamcho.yakyeon.domain.medication.entity.TimingSlot;
 import lombok.RequiredArgsConstructor;
@@ -20,8 +21,10 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * 복용 일정·기록 조회 (오늘의 일정, 주간 일정, 복용 알림 내역, 홈 요약). 복약자의 건강정보라서
@@ -98,7 +101,7 @@ public class DoseQueryService {
         return query(patientId, start, end, statuses, true);
     }
 
-    /** 홈 화면: 오늘의 복약 현황 (진행률, 아침·점심·저녁 아이콘, 다음 복약) */
+    /** 홈 화면: 오늘의 복약 현황 (진행률, 시간대 아이콘, 다음 복약, 체크 안 한 약과 다음 예정 약 목록, 오늘 복용 완료 여부) */
     @Transactional(readOnly = true)
     public HomeSummaryResponse homeSummary(Long userId, Long patientId) {
         patientAccessGuard.check(userId, patientId, AccessAction.VIEW, RESOURCE_TYPE, null);
@@ -122,11 +125,22 @@ public class DoseQueryService {
                     kst(r.scheduledAt()), DoseStatus.valueOf(r.status()),
                     toMedications(doseQueryRepository.findItems(List.of(r.doseId())).get(r.doseId())));
         }
+
+        HomeSummaryLists.Lists lists = HomeSummaryLists.split(
+                rows.stream().map(r -> new HomeSummaryLists.Dose(r.doseId(), r.status(), r.scheduledAt(), r.closeAt())).toList(),
+                now);
+        List<Long> listedIds = new ArrayList<>(lists.uncheckedIds());
+        listedIds.addAll(lists.upcomingIds());
+        Map<Long, List<DoseQueryRepository.ItemRow>> items = listedIds.isEmpty() ? Map.of() : doseQueryRepository.findItems(listedIds);
+        Map<Long, DoseQueryRepository.DoseRow> byId = rows.stream().collect(Collectors.toMap(DoseQueryRepository.DoseRow::doseId, r -> r));
+        List<DoseResponse> unchecked = lists.uncheckedIds().stream().map(id -> toResponse(byId.get(id), items.get(id))).toList();
+        List<DoseResponse> upcoming = lists.upcomingIds().stream().map(id -> toResponse(byId.get(id), items.get(id))).toList();
+
         return new HomeSummaryResponse(today, s.total(), s.done(), s.normal(), s.delayed(), s.missed(), s.pending(),
                 s.slots().stream()
                         .map(st -> new HomeSummaryResponse.Slot(TimingSlot.valueOf(st.slot()), st.state()))
                         .toList(),
-                next);
+                next, kst(now), unchecked, upcoming, lists.allDone(s.total()));
     }
 
     /**
