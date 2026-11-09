@@ -21,6 +21,7 @@ import com.gamcho.yakyeon.domain.account.logic.LoginLockRules;
 import com.gamcho.yakyeon.domain.account.repository.AppUserRepository;
 import com.gamcho.yakyeon.domain.account.repository.AuthTokenRepository;
 import com.gamcho.yakyeon.domain.account.repository.LoginAttemptRepository;
+import com.gamcho.yakyeon.domain.notification.repository.PushTokenRepository;
 import com.gamcho.yakyeon.domain.account.repository.PatientRepository;
 import com.gamcho.yakyeon.domain.account.repository.TermsVersionRepository;
 import com.gamcho.yakyeon.domain.account.repository.UserAgreementRepository;
@@ -71,6 +72,7 @@ public class AuthService {
     private final PhoneHasher phoneHasher;
     private final SignupVerificationService signupVerificationService;
     private final LoginAttemptRepository loginAttemptRepository;
+    private final PushTokenRepository pushTokenRepository;
 
     @Value("${jwt.refresh-token-expiration-seconds:1209600}")
     private long refreshTokenExpirationSeconds;
@@ -394,9 +396,14 @@ public class AuthService {
         );
     }
 
+    /**
+     * 이 사용자의 모든 로그인 세션을 끝낸다. 푸시 토큰도 함께 지운다: 세션이 끝난 기기(로그아웃된 상태)로 알림이 계속 가면 안 되고,
+     * 다시 로그인하면 앱이 토큰을 새로 등록한다(PUT /users/me/push-token).
+     */
     private void revokeAllTokensFor(Long userId, AuthToken.RevokeReason reason) {
         authTokenRepository.findByUser_UserIdAndRevokedAtIsNull(userId)
                 .forEach(t -> t.revoke(reason));
+        pushTokenRepository.deleteAllFor(userId);
     }
 
     private record AgreementPlan(TermsVersion termsVersion, Boolean agreed) {

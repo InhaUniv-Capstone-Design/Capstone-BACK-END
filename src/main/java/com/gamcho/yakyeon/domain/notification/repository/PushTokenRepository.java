@@ -26,6 +26,14 @@ public class PushTokenRepository {
                         .addValue("permitted", notificationPermitted));
     }
 
+    /**
+     * 이 사용자의 모든 기기 토큰을 지운다. 모든 로그인 세션이 끝날 때(비밀번호 변경, 로그인 토큰 재사용 감지) 쓴다:
+     * 로그아웃된 기기로 알림이 계속 가면 안 되고, 다시 로그인하면 앱이 토큰을 새로 등록한다.
+     */
+    public void deleteAllFor(long userId) {
+        jdbc.update("DELETE FROM push_token WHERE user_id = :me", new MapSqlParameterSource("me", userId));
+    }
+
     /** 내 토큰만 지운다. 없거나 남의 토큰이어도 아무것도 지우지 않고 조용히 끝난다 (토큰 존재 여부를 알려주지 않는다) */
     public void delete(long userId, String fcmToken) {
         jdbc.update("DELETE FROM push_token WHERE user_id = :me AND fcm_token = :token",
