@@ -45,6 +45,10 @@ public final class PrescriptionTextParser {
     private static final Pattern DATE = Pattern.compile(
             "(20\\d{2})\\s*[년.\\-/]\\s*(\\d{1,2})\\s*[월.\\-/]\\s*(\\d{1,2})");
 
+    /** 교부번호 안의 날짜: "20240520-001"은 2024-05-20에 교부한 첫 번째 번호 (구분 기호가 없어서 DATE로는 안 잡힌다) */
+    private static final Pattern ISSUE_NUMBER_DATE = Pattern.compile(
+            "(?<![0-9])(20\\d{2})(0[1-9]|1[0-2])(0[1-9]|[12]\\d|3[01])\\s*[-–]\\s*\\d{1,4}(?![0-9])");
+
     /** 약 한 줄: 이름 + 1회 투약량 + 1일 횟수 + 총 일수 + 나머지(용법). 이름 안의 함량(500mg 등)이 숫자 칸으로 오인되지 않게 숫자는 한두 자리로 제한 */
     private static final Pattern ROW = Pattern.compile(
             "^(?<name>.*?[가-힣A-Za-z].*?)\\s+(?<dose>\\d{1,2}(?:[./]\\d{1,2})?|½)\\s*(?:정|캡슐|캡|포|개|알|매|mL|ml|g)?"
@@ -85,8 +89,13 @@ public final class PrescriptionTextParser {
             }
         }
 
+        // 약국 복약안내문·약봉투 양식(복용법이 "1정식 2회 30일분" 문장)을 가장 먼저 본다. 이 양식은 표 인식을 켜도 값이 한 칸에 뭉쳐서
+        // 아래 표 해석으로는 이름만 읽히고 값이 비기 때문이다. 문장을 하나도 못 찾으면 빈 목록이라 기존 처방전 해석으로 넘어간다.
+        List<OcrResult.Item> items = PillBagTextParser.itemsFromWords(doc.words());
         // 시간대 칸 양식을 먼저 본다: 그 양식의 머리글("약품명", "투약일수", "복용법")이 일반 양식 머리글로도 보여서 일반 쪽이 먼저면 시간대를 놓친다
-        List<OcrResult.Item> items = slotItemsFromTables(doc.tables());
+        if (items.isEmpty()) {
+            items = slotItemsFromTables(doc.tables());
+        }
         if (items.isEmpty()) {
             items = itemsFromTables(doc.tables());
         }
@@ -133,6 +142,15 @@ public final class PrescriptionTextParser {
         LocalDate fallback = null;
         for (String text : texts) {
             boolean labeled = text.contains("교부") || text.contains("발행") || text.contains("처방일");
+            if (text.contains("교부")) {
+                Matcher issue = ISSUE_NUMBER_DATE.matcher(text);
+                if (issue.find()) {
+                    LocalDate date = toDate(issue.group(1), issue.group(2), issue.group(3));
+                    if (date != null && !date.isBefore(today.minusYears(5)) && !date.isAfter(today.plusDays(1))) {
+                        return date;
+                    }
+                }
+            }
             Matcher m = DATE.matcher(text);
             while (m.find()) {
                 LocalDate date = toDate(m.group(1), m.group(2), m.group(3));
