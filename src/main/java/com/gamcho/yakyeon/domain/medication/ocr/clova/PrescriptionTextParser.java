@@ -105,6 +105,11 @@ public final class PrescriptionTextParser {
         if (items.isEmpty()) {
             items = itemsFromRows(rowTexts);
         }
+        // 위 방법이 모두 약을 못 찾았을 때의 마지막 방법: 표나 문장 모양을 가정하지 않고 글에서 약 이름과 복용 정보를 각각 찾는다.
+        // 약국마다 약봉투 양식이 달라서, 처음 보는 양식도 이름이라도 읽어 초안을 채우려는 것이다(못 찾은 값은 비어 있다).
+        if (items.isEmpty()) {
+            items = GenericMedicationTextParser.items(rows.isEmpty() ? rowTexts : GenericMedicationTextParser.rowTexts(rows));
+        }
         return new OcrResult(findHospital(allTexts), findPharmacy(allTexts), findDate(allTexts, today), dedupe(items));
     }
 
