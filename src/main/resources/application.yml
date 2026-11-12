@@ -48,6 +48,13 @@ sms:
 rate-limit:
   enabled: true
 
+# API Gateway를 거친 요청만 받고 진짜 사용자 접속 주소를 읽는다 (기본 꺼짐. 켜는 순서는 배포 안내서 참고)
+gateway-origin:
+  enabled: ${GATEWAY_ORIGIN_ENABLED:false}
+  secret: ${GATEWAY_ORIGIN_SECRET:}
+  allow-loopback: ${GATEWAY_ORIGIN_ALLOW_LOOPBACK:true}
+  proxy-hops: ${GATEWAY_ORIGIN_PROXY_HOPS:1}
+
 # 탈퇴 데이터 파기 (탈퇴한 사람의 건강기록을 보관 기간 뒤에 실제로 삭제한다. 10분마다 점검)
 privacy:
   purge:

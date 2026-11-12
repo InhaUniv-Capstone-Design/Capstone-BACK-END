@@ -2,6 +2,7 @@ package com.gamcho.yakyeon.common.ratelimit;
 
 import com.gamcho.yakyeon.common.exception.BusinessException;
 import com.gamcho.yakyeon.common.exception.ErrorCode;
+import com.gamcho.yakyeon.common.origin.GatewayOriginFilter;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,9 +17,10 @@ import java.util.function.LongSupplier;
 /**
  * @RateLimit이 붙은 API의 호출 횟수를 접속 주소별로 센다.
  *
- * 접속 주소는 request.getRemoteAddr()다. 서버가 API Gateway 같은 중간 장치 뒤에 있으면 모든 사용자가 그 장치의 주소로
- * 보여서 한도를 함께 쓰게 되니, 그때는 서버 설정(server.forward-headers-strategy와 신뢰할 프록시)으로 실제 사용자 주소가
- * 들어오게 해야 한다. 요청 헤더(X-Forwarded-For)를 이 코드가 직접 믿지는 않는다(누구나 위조할 수 있어서).
+ * 접속 주소는 GatewayOriginFilter.clientIp()다. gateway-origin이 꺼져 있으면(기본) request.getRemoteAddr()와 같다.
+ * 서버가 API Gateway 뒤에 있으면 모든 사용자가 API Gateway의 주소로 보여서 한도를 함께 쓰게 되는데, gateway-origin을 켜면
+ * API Gateway를 거친 것이 확인된 요청에 한해 X-Forwarded-For에서 진짜 사용자 주소를 읽는다. 확인되지 않은 요청의
+ * X-Forwarded-For는 믿지 않는다(누구나 위조할 수 있어서).
  * 한도 설정은 rate-limit.enabled=false로 끌 수 있다(시험용).
  */
 @Component
@@ -49,7 +51,8 @@ public class RateLimitInterceptor implements HandlerInterceptor {
         if (rule == null) {
             return true;
         }
-        String address = request.getRemoteAddr() == null ? "unknown" : request.getRemoteAddr();
+        String clientIp = GatewayOriginFilter.clientIp(request);
+        String address = clientIp == null ? "unknown" : clientIp;
         if (!counter.tryAcquire(rule.name() + "|" + address, rule.limit(), rule.windowSeconds(), clock.getAsLong())) {
             throw new BusinessException(ErrorCode.RATE_LIMITED);
         }
