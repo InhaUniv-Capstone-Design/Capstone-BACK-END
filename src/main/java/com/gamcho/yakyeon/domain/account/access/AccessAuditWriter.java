@@ -1,5 +1,6 @@
 package com.gamcho.yakyeon.domain.account.access;
 
+import com.gamcho.yakyeon.common.origin.GatewayOriginFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
@@ -41,13 +42,14 @@ public class AccessAuditWriter {
     }
 
     /**
-     * 요청한 쪽의 IP. 프록시 헤더(X-Forwarded-For)는 일부러 믿지 않는다 - 클라이언트가 마음대로 위조할 수 있어서
-     * 감사 기록의 신뢰성을 해친다. 리버스 프록시 뒤에 배포하면 서버 설정으로 원본 IP를 전달받도록 따로 처리해야 한다.
+     * 요청한 쪽의 IP. 프록시 헤더(X-Forwarded-For)는 아무 요청에서나 믿지 않는다 - 클라이언트가 마음대로 위조할 수 있어서
+     * 감사 기록의 신뢰성을 해친다. gateway-origin을 켜면 API Gateway를 거친 것이 확인된 요청에 한해 진짜 사용자 IP를 쓰고,
+     * 꺼져 있으면 연결된 쪽의 주소(getRemoteAddr)다 (GatewayOriginFilter.clientIp).
      */
     private String currentIp() {
         RequestAttributes attrs = RequestContextHolder.getRequestAttributes();
         if (attrs instanceof ServletRequestAttributes servletAttrs) {
-            return servletAttrs.getRequest().getRemoteAddr();
+            return GatewayOriginFilter.clientIp(servletAttrs.getRequest());
         }
         return null;
     }
