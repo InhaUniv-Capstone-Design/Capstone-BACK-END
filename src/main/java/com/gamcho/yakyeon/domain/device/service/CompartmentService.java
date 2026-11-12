@@ -11,8 +11,10 @@ import com.gamcho.yakyeon.domain.device.entity.Device;
 import com.gamcho.yakyeon.domain.device.entity.DeviceStatus;
 import com.gamcho.yakyeon.domain.device.entity.MappingStatus;
 import com.gamcho.yakyeon.domain.device.logic.CompartmentRules;
+import com.gamcho.yakyeon.domain.device.logic.PouchCounter;
 import com.gamcho.yakyeon.domain.device.repository.CompartmentMappingRepository;
 import com.gamcho.yakyeon.domain.device.repository.DeviceRepository;
+import com.gamcho.yakyeon.domain.dose.logic.MedWindow;
 import com.gamcho.yakyeon.domain.medication.entity.MedicationStatus;
 import com.gamcho.yakyeon.domain.medication.entity.Prescription;
 import com.gamcho.yakyeon.domain.medication.repository.PatientMedicationRepository;
@@ -24,13 +26,17 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * 약봉지(처방)를 약통의 칸에 배정하고, 충전을 확인하고, 해제한다.
  * 복약자의 약 정보를 약통에 연결하는 일이라 모두 수정 권한(본인 또는 읽기·쓰기 권한 보호자)이 필요하다.
  * 연동이 없는 사람에게는 "없는 번호"와 같은 오류를 줘서 번호가 존재한다는 사실이 새지 않게 한다.
  *
- * 흐름: 칸 배정(PENDING_LOAD) → 충전 확인(ACTIVE, 채운 수 기록) → 필요하면 추가 충전 → 해제(ENDED).
+ * 흐름: 칸 배정(바로 ACTIVE, 채운 수 기록) → 필요하면 추가 충전 → 해제(ENDED).
+ * 앱 화면에 충전 확인 단계가 없어서 배정할 때 충전까지 한 번에 확인한 것으로 처리한다. 충전 확인(load)은 예전에 배정되어 PENDING_LOAD로
+ * 남은 칸을 위해서만 남겨 둔다.
  * 처방이 끝나면 DB 함수가 배정을 자동으로 끝낸다 (복용 종료 API가 호출한다).
  */
 @Service
@@ -45,9 +51,14 @@ public class CompartmentService {
     private final DeviceRepository deviceRepository;
     private final CompartmentMappingRepository compartmentMappingRepository;
 
-    /** 약봉지를 칸에 배정한다 (칸은 정했지만 아직 약봉지를 채우지 않은 상태) */
+    /**
+     * 약봉지를 칸에 배정하고, 바로 충전을 확인한 상태(ACTIVE)로 만든다. 이 시각부터 이 칸의 신호를 이 약봉지로 본다.
+     *
+     * 넣은 약봉지 수는 loadedCount를 받으면 그 값, 없으면 처방의 남은 복용 일정으로 센다(복용 시간대 수 × 남은 일수, 약마다 기간이
+     * 다르면 그 차이 반영). 약봉지 하나는 복용 한 번에 해당한다.
+     */
     @Transactional
-    public CompartmentMappingResponse assign(Long userId, Long prescriptionId, int compartmentNo) {
+    public CompartmentMappingResponse assign(Long userId, Long prescriptionId, int compartmentNo, Integer loadedCount) {
         Prescription prescription = prescriptionRepository.findById(prescriptionId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.PRESCRIPTION_NOT_FOUND));
         Long patientId = prescription.getPatient().getPatientId();
@@ -76,6 +87,8 @@ public class CompartmentService {
                 .prescriptionId(prescriptionId)
                 .confirmedByUserId(userId)
                 .build();
+        int pouches = loadedCount != null ? loadedCount : plannedPouchCount(patientId, prescriptionId);
+        mapping.load(pouches, userId, OffsetDateTime.now(ApiTime.SERVICE_ZONE));
         try {
             return CompartmentMappingResponse.from(compartmentMappingRepository.saveAndFlush(mapping));
         } catch (DataIntegrityViolationException e) {
@@ -150,6 +163,18 @@ public class CompartmentService {
             }
             throw e;
         }
+    }
+
+    /** 이 처방에 앞으로 필요한 약봉지 수 (삭제된 약과 필요 시 복용 약은 예정이 없으니 뺀다) */
+    private int plannedPouchCount(Long patientId, Long prescriptionId) {
+        List<MedWindow> meds = patientMedicationRepository.findAliveByPatientId(patientId).stream()
+                .filter(m -> m.getPrescription() != null && prescriptionId.equals(m.getPrescription().getPrescriptionId()))
+                .filter(m -> !m.isPrn())
+                .map(m -> new MedWindow(
+                        m.getTimings().stream().map(t -> t.getTimingSlot().name()).collect(Collectors.toSet()),
+                        m.getStartDate(), m.getEndDate(), m.getEndedAt()))
+                .toList();
+        return PouchCounter.remaining(meds, ApiTime.today(), ApiTime.SERVICE_ZONE);
     }
 
     /** 이 처방에 아직 끝나지 않은 약이 하나라도 있는지 */

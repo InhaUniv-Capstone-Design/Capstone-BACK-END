@@ -26,17 +26,17 @@ public class CompartmentController {
 
     private final CompartmentService compartmentService;
 
-    /** 약봉지(처방)를 약통의 칸에 배정. 이 시점에는 아직 채우지 않은 상태(PENDING_LOAD)다 */
+    /** 약봉지(처방)를 약통의 칸에 배정하고 바로 충전을 확인한 상태(ACTIVE)로 만든다 (별도의 충전 확인 단계가 없다) */
     @PostMapping("/prescriptions/{prescriptionId}/compartment")
     public ResponseEntity<CompartmentMappingResponse> assign(
             @AuthenticationPrincipal Long userId,
             @PathVariable("prescriptionId") Long prescriptionId,
             @Valid @RequestBody CompartmentAssignRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(compartmentService.assign(userId, prescriptionId, request.getCompartmentNo()));
+                .body(compartmentService.assign(userId, prescriptionId, request.getCompartmentNo(), request.getLoadedCount()));
     }
 
-    /** 약봉지를 칸에 채운 뒤 충전을 확인 (채운 약봉지 수가 남은 수의 시작값) */
+    /** 충전 확인이 안 된 예전 배정(PENDING_LOAD)의 충전을 확인한다. 새로 배정한 칸은 이미 충전 확인된 상태라 이 API가 필요 없다 */
     @PostMapping("/compartment-mappings/{mappingId}/load")
     public ResponseEntity<CompartmentMappingResponse> load(
             @AuthenticationPrincipal Long userId,
