@@ -33,7 +33,7 @@ import java.util.Optional;
  *  - 버튼은 받는 즉시 처리한다: 허용 시간 안에 열림이 있으면 CONFIRMED, 없으면 BUTTON_ONLY.
  *  - 열림은 버튼을 기다린다. 허용 시간 안에 버튼이 오면 그 버튼이 짝으로 처리하고,
  *    끝내 안 오면 정기 작업(closeOneStaleIr)이 "열기만 함(OPEN_ONLY)"으로 기록한다.
- *  - 복용을 확인한 직후 허용 시간 안의 반복 버튼, 손을 빼다가 생긴 열림은 같은 복용으로 보고 무시한다.
+ *  - 복용을 확인한 직후 5초 안의 반복 버튼, 허용 시간(기본 60초) 안에 손을 빼다가 생긴 열림은 같은 복용으로 보고 무시한다.
  *  - 이 칸에 충전이 확인된 약봉지가 없거나 충전 전에 온 신호는 저장만 하고 무시한다.
  */
 @Service
@@ -152,7 +152,8 @@ public class DeviceSignalService {
                                               int compartmentNo, long signalId,
                                               OffsetDateTime pressedAt, OffsetDateTime lastConfirmed,
                                               Duration window, OffsetDateTime now) {
-        if (SignalPairing.isWithinWindowAfter(lastConfirmed, pressedAt, window)) {
+        // 반복 누름은 열림-버튼 짝짓기 허용 시간(window)이 아니라 따로 정한 짧은 시간으로 판단한다
+        if (SignalPairing.isWithinWindowAfter(lastConfirmed, pressedAt, SignalPairing.REPEAT_PRESS_IGNORE)) {
             signalRepository.markProcessed(List.of(signalId), now);
             return DeviceSignalResponse.of(signalId, "IGNORED_REPEATED_PRESS");
         }

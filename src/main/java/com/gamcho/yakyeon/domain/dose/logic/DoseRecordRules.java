@@ -12,7 +12,7 @@ import java.util.Optional;
 public final class DoseRecordRules {
 
     /** 예정 시각보다 이 시간 이전의 복용 시각은 기록할 수 없다 (임시 기준 - 팀에서 정하면 이 상수만 바꾼다) */
-    public static final Duration EARLIEST_BEFORE_SCHEDULED = Duration.ofHours(6);
+    public static final Duration EARLIEST_BEFORE_SCHEDULED = Duration.ofHours(3);
 
     /** 이 시간 안에서 같은 상태로 다시 기록하면 같은 기록으로 본다 (같은 버튼을 두 번 누른 경우) */
     public static final Duration SAME_RECORD_TOLERANCE = Duration.ofSeconds(60);

@@ -18,6 +18,12 @@ public final class SignalPairing {
     /** 기기 시계가 서버보다 이만큼까지 앞서는 것은 오차로 보고 그대로 쓴다. 더 앞서면 서버가 받은 시각으로 바꾼다 */
     public static final Duration CLOCK_TOLERANCE = Duration.ofMinutes(5);
 
+    /**
+     * 복용이 확인된 뒤 같은 칸의 버튼을 이 시간 안에 또 누르면 같은 복용의 반복으로 보고 무시한다.
+     * 열림-버튼 짝짓기 허용 시간(pair_window_sec, 기본 60초)과는 따로 정한다 (팀 결정 - 이 상수만 바꾼다).
+     */
+    public static final Duration REPEAT_PRESS_IGNORE = Duration.ofSeconds(5);
+
     private SignalPairing() {
     }
 

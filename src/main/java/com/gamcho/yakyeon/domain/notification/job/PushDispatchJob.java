@@ -7,8 +7,8 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 /**
- * 푸시 발송 정기 작업. 15초마다 새 알림을 보내고, 재시도할 차례가 된 실패를 다시 보낸다.
- * 이전 실행이 끝난 뒤 15초를 기다리는 방식(fixedDelay)이라 실행이 겹치지 않는다.
+ * 푸시 발송 정기 작업. 기본 5초마다(push.dispatch-interval-ms) 새 알림을 보내고, 재시도할 차례가 된 실패를 다시 보낸다.
+ * 이전 실행이 끝난 뒤 위 시간을 기다리는 방식(fixedDelay)이라 실행이 겹치지 않는다.
  * 보낸 건이 있을 때만 건수 로그를 남기고 토큰이나 알림 내용은 남기지 않는다.
  */
 @Slf4j
@@ -18,7 +18,7 @@ public class PushDispatchJob {
 
     private final PushDispatchService pushDispatchService;
 
-    @Scheduled(fixedDelay = 15_000, initialDelay = 30_000)
+    @Scheduled(fixedDelayString = "${push.dispatch-interval-ms:5000}", initialDelay = 30_000)
     public void run() {
         try {
             int sent = pushDispatchService.dispatchNew();
