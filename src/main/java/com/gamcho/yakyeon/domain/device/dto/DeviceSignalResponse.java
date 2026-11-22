@@ -12,7 +12,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  *  WAITING_FOR_BUTTON        - 칸 열림을 받았고, 허용 시간 안에 버튼을 기다리는 중
  *  CONFIRMED                 - 열림과 버튼이 짝이 되어 복용으로 확인됨
  *  BUTTON_ONLY               - 열림 없이 버튼만 눌림 (센서 오류 가능성) - 복용으로 확인됨
- *  IGNORED_REPEATED_PRESS    - 복용 직후 허용 시간 안의 반복 버튼 (무시)
+ *  IGNORED_REPEATED_PRESS    - 복용 직후 5초 안(SignalPairing.REPEAT_PRESS_IGNORE)의 반복 버튼 (무시)
  *  IGNORED_AFTER_TAKEN       - 복용 직후 허용 시간 안의 열림 (무시)
  *  IGNORED_NO_ACTIVE_MAPPING - 이 칸에 충전이 확인된 약봉지가 없음 (무시)
  *

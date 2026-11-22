@@ -88,4 +88,14 @@ class SignalPairingTest {
         assertThat(SignalPairing.isStale(received, WINDOW, at("08:01:00"))).isTrue();
         assertThat(SignalPairing.isStale(received, WINDOW, at("08:01:01"))).isTrue();
     }
+
+    @Test
+    void 같은_버튼_반복은_5초_안만_무시하고_짝짓기_시간_60초와_따로다() {
+        OffsetDateTime confirmed = at("08:00:00");
+        assertThat(SignalPairing.REPEAT_PRESS_IGNORE.getSeconds()).isEqualTo(5);
+        assertThat(SignalPairing.isWithinWindowAfter(confirmed, at("08:00:05"), SignalPairing.REPEAT_PRESS_IGNORE)).as("5초 뒤").isTrue();
+        assertThat(SignalPairing.isWithinWindowAfter(confirmed, at("08:00:06"), SignalPairing.REPEAT_PRESS_IGNORE)).as("6초 뒤").isFalse();
+        // 짝짓기 허용 시간은 그대로 60초
+        assertThat(SignalPairing.isWithinWindowAfter(confirmed, at("08:00:06"), WINDOW)).isTrue();
+    }
 }
