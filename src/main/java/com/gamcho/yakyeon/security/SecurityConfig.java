@@ -61,6 +61,7 @@ public class SecurityConfig {
                         // 앞으로 patient/medication 등 새 컨트롤러를 추가해도 기본은 "인증 필요" -
                         // 개별 엔드포인트를 열어주려면 여기에 명시적으로 추가해야 하므로,
                         // "깜빡하고 인증 없이 노출"되는 실수를 구조적으로 막는다.
+                        .requestMatchers(HttpMethod.POST, "/device/compartment-state").permitAll()
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
