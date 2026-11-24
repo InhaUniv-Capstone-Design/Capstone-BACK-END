@@ -1,5 +1,6 @@
 package com.gamcho.yakyeon.domain.notification.push.fcm;
 
+import com.gamcho.yakyeon.domain.notification.push.DataPush;
 import com.gamcho.yakyeon.domain.notification.push.PushMessage;
 import com.gamcho.yakyeon.domain.notification.push.PushResult;
 import com.gamcho.yakyeon.domain.notification.push.PushSender;
@@ -14,6 +15,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.function.Supplier;
 
 /**
  * 실제 FCM으로 푸시를 보낸다 (FCM HTTP v1: POST /v1/projects/{프로젝트}/messages:send). MockPushSender 자리에 들어가는 구현이다.
@@ -29,6 +31,8 @@ public class FcmPushSender implements PushSender {
 
     private static final Logger log = LoggerFactory.getLogger(FcmPushSender.class);
     private static final int MAX_RESPONSE_BYTES = 64_000;
+    /** 데이터 푸시(IR_TRIGGER)를 기기가 꺼져 있을 때 FCM이 보관하는 시간. 지금 다시 조회하라는 신호라 길 필요가 없다 */
+    private static final int STATE_PUSH_TTL_SECONDS = 60;
 
     private final GoogleAccessTokenProvider tokens;
     private final URI sendUri;
@@ -53,8 +57,18 @@ public class FcmPushSender implements PushSender {
 
     @Override
     public PushResult send(PushMessage message) {
+        return deliver(() -> FcmJson.message(message, ttlSeconds));
+    }
+
+    /** 화면 갱신용 데이터 푸시. 보내는 방법과 결과 분류는 send와 같고, 본문과 보관 시간(STATE_PUSH_TTL_SECONDS)만 다르다 */
+    @Override
+    public PushResult sendData(DataPush push) {
+        return deliver(() -> FcmJson.dataMessage(push, STATE_PUSH_TTL_SECONDS));
+    }
+
+    private PushResult deliver(Supplier<String> bodyMaker) {
         try {
-            String body = FcmJson.message(message, ttlSeconds);
+            String body = bodyMaker.get();
             Reply response = post(body, tokens.accessToken());
             if (response.statusCode() == 401) {
                 tokens.invalidate();

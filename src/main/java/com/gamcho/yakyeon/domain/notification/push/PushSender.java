@@ -10,4 +10,10 @@ package com.gamcho.yakyeon.domain.notification.push;
 public interface PushSender {
 
     PushResult send(PushMessage message);
+
+    /**
+     * 알림 창 없이 앱에게 "다시 조회하라"고만 알리는 데이터 푸시 (DataPush). 알림 문구도 알림 번호도 없고, 실패해도 다시 보내지 않는다.
+     * 약속은 send와 같다: 네트워크 호출이 있을 수 있어 트랜잭션 밖에서 부르고, 예외를 던지지 말고 결과로 돌려준다.
+     */
+    PushResult sendData(DataPush push);
 }

@@ -23,4 +23,13 @@ public class MockPushSender implements PushSender {
             case INVALID_TOKEN -> PushResult.invalidToken();
         };
     }
+
+    @Override
+    public PushResult sendData(DataPush push) {
+        return switch (MockPushRules.classify(push.fcmToken())) {
+            case SENT -> PushResult.sent("mock-data-" + UUID.randomUUID());
+            case TRANSIENT_FAILURE -> PushResult.transientFailure("TRANSIENT_FAILURE");
+            case INVALID_TOKEN -> PushResult.invalidToken();
+        };
+    }
 }

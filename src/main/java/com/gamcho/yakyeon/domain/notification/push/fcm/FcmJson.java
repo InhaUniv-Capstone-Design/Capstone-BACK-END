@@ -1,5 +1,6 @@
 package com.gamcho.yakyeon.domain.notification.push.fcm;
 
+import com.gamcho.yakyeon.domain.notification.push.DataPush;
 import com.gamcho.yakyeon.domain.notification.push.PushMessage;
 
 /**
@@ -25,6 +26,24 @@ public final class FcmJson {
                 + ",\"data\":{\"title\":" + quote(m.title())
                 + ",\"body\":" + quote(m.body())
                 + ",\"notification_id\":" + quote(Long.toString(m.notificationId())) + "}"
+                + ",\"android\":{\"priority\":\"high\",\"ttl\":\"" + ttlSeconds + "s\"}}}";
+    }
+
+    /**
+     * 화면 갱신용 데이터 푸시 본문 (IR_TRIGGER 등). 앱과 정한 형식:
+     *   {"message":{"token":"기기 토큰",
+     *               "data":{"type":"IR_TRIGGER","signal_type":"IR_TRIGGER","patient_id":"10","compartment_no":"1"},
+     *               "android":{"priority":"high","ttl":"60s"}}}
+     *  - notification 블록, title, body, notification_id가 없다. 앱은 이 푸시로 화면을 그리지 않고 API를 다시 조회한다.
+     *  - data의 값은 모두 문자열이다 (patient_id, compartment_no도 문자열).
+     *  - ttl은 짧게 둔다: 기기가 꺼져 있다 나중에 받아도 의미 없는 "지금 다시 조회" 신호이기 때문이다.
+     */
+    public static String dataMessage(DataPush p, int ttlSeconds) {
+        return "{\"message\":{\"token\":" + quote(p.fcmToken())
+                + ",\"data\":{\"type\":" + quote(p.type())
+                + ",\"signal_type\":" + quote(p.type())
+                + ",\"patient_id\":" + quote(Long.toString(p.patientId()))
+                + ",\"compartment_no\":" + quote(Integer.toString(p.compartmentNo())) + "}"
                 + ",\"android\":{\"priority\":\"high\",\"ttl\":\"" + ttlSeconds + "s\"}}}";
     }
 

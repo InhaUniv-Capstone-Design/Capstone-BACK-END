@@ -55,6 +55,9 @@ gateway-origin:
   allow-loopback: ${GATEWAY_ORIGIN_ALLOW_LOOPBACK:true}
   proxy-hops: ${GATEWAY_ORIGIN_PROXY_HOPS:1}
 
+device-gateway:
+  key: ${DEVICE_GATEWAY_KEY:}
+
 # 탈퇴 데이터 파기 (탈퇴한 사람의 건강기록을 보관 기간 뒤에 실제로 삭제한다. 10분마다 점검)
 privacy:
   purge:

@@ -45,8 +45,8 @@ class EndpointAuthenticationTest {
             "POST /revocations/request",
             "POST /revocations/confirm",
             "POST /device/heartbeat",
-            "POST /device/signals");
-
+            "POST /device/signals",
+            "POST /device/compartment-state");
     @Autowired
     private WebApplicationContext context;
 
@@ -59,7 +59,7 @@ class EndpointAuthenticationTest {
     private RequestMappingHandlerMapping handlerMapping;
 
     @Test
-    @DisplayName("공개 API 14개를 뺀 모든 API는 로그인 정보 없이 부르면 401이다")
+    @DisplayName("공개 API 15개를 뺀 모든 API는 로그인 정보 없이 부르면 401이다")
     void everythingExceptThePublicEndpointsRequiresLogin() throws Exception {
         MockMvc mockMvc = MockMvcBuilders.webAppContextSetup(context).addFilters(springSecurityFilterChain).build();
 

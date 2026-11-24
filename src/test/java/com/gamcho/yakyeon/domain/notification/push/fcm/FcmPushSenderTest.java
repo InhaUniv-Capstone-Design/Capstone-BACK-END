@@ -3,6 +3,7 @@ package com.gamcho.yakyeon.domain.notification.push.fcm;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.gamcho.yakyeon.domain.medication.ocr.clova.MiniJson;
+import com.gamcho.yakyeon.domain.notification.push.DataPush;
 import com.gamcho.yakyeon.domain.notification.push.PushMessage;
 import com.gamcho.yakyeon.domain.notification.push.PushResult;
 import com.sun.net.httpserver.HttpServer;
@@ -126,6 +127,39 @@ class FcmPushSenderTest {
             assertThat(MiniJson.asString(data.get("body"))).isEqualTo("아침 약을 복용할 시간입니다.");
             assertThat(MiniJson.asString(data.get("notification_id"))).isEqualTo("12345");
             assertThat(MiniJson.asString(MiniJson.asMap(message.get("android")).get("priority"))).isEqualTo("high");
+        }
+    }
+
+    @Test
+    @DisplayName("데이터 푸시(IR_TRIGGER): 같은 인증으로 보내고, 본문에 알림 문구 없이 type/signal_type/patient_id/compartment_no만 있다")
+    void sendsDataPushWithoutNotificationParts() throws Exception {
+        try (Fake fake = new Fake()) {
+            PushResult result = fake.sender(5000).sendData(new DataPush(DEVICE_TOKEN, DataPush.IR_TRIGGER, 10L, 2));
+            assertThat(result.status()).isEqualTo(PushResult.Status.SENT);
+            assertThat(fake.authHeaders.get(0)).isEqualTo("Bearer ya29.tok1");
+            Map<String, Object> message = MiniJson.asMap(MiniJson.asMap(MiniJson.parse(fake.bodies.get(0))).get("message"));
+            assertThat(MiniJson.asString(message.get("token"))).isEqualTo(DEVICE_TOKEN);
+            assertThat(message.containsKey("notification")).isFalse();
+            Map<String, Object> data = MiniJson.asMap(message.get("data"));
+            assertThat(MiniJson.asString(data.get("type"))).isEqualTo("IR_TRIGGER");
+            assertThat(MiniJson.asString(data.get("signal_type"))).isEqualTo("IR_TRIGGER");
+            assertThat(MiniJson.asString(data.get("patient_id"))).isEqualTo("10");
+            assertThat(MiniJson.asString(data.get("compartment_no"))).isEqualTo("2");
+            assertThat(data.containsKey("title")).isFalse();
+            assertThat(data.containsKey("body")).isFalse();
+            Map<String, Object> android = MiniJson.asMap(message.get("android"));
+            assertThat(MiniJson.asString(android.get("priority"))).isEqualTo("high");
+            assertThat(MiniJson.asString(android.get("ttl"))).isEqualTo("60s");
+        }
+    }
+
+    @Test
+    @DisplayName("데이터 푸시도 무효 토큰이면 INVALID_TOKEN으로 알린다")
+    void dataPushReportsUnregisteredToken() throws Exception {
+        try (Fake fake = new Fake()) {
+            fake.respond(404, fcmError(404, "NOT_FOUND", "UNREGISTERED", "Requested entity was not found."));
+            assertThat(fake.sender(5000).sendData(new DataPush(DEVICE_TOKEN, DataPush.IR_TRIGGER, 10L, 1)).status())
+                    .isEqualTo(PushResult.Status.INVALID_TOKEN);
         }
     }
 
