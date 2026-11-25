@@ -35,3 +35,10 @@ out/
 
 ### VS Code ###
 .vscode/
+
+### Secrets - 절대 커밋 금지 ###
+application-local.yml
+application-*-local.yml
+
+### 테스트용 SQL ###
+src/main/resources/db/

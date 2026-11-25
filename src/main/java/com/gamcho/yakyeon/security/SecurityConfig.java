@@ -1,0 +1,80 @@
+package com.gamcho.yakyeon.security;
+
+import com.gamcho.yakyeon.security.jwt.JwtAuthenticationFilter;
+import lombok.RequiredArgsConstructor;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
+import org.springframework.security.config.Customizer;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.provisioning.InMemoryUserDetailsManager;
+import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+
+import java.util.List;
+
+/**
+ * 공개 엔드포인트(signup/check-id/login/refresh/logout, 가입용 문자 인증, 아이디 찾기·비밀번호 재설정, GET /terms, POST /revocations/*)만 permitAll, 나머지는 인증 필요.
+ * httpBasic/formLogin을 꺼서 기본 AuthenticationEntryPoint가 없어졌던 걸
+ * JwtAuthenticationEntryPoint로 직접 등록해서, 인증 안 된 요청이
+ * 403(빈 바디) 대신 401 + 공통 에러 포맷으로 나가게 한다.
+ */
+@Configuration
+@RequiredArgsConstructor
+public class SecurityConfig {
+
+    private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
+
+    @Bean
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        http
+                .csrf(AbstractHttpConfigurer::disable)
+                // JWT는 헤더로 전달되고 세션 쿠키를 쓰지 않으므로 CSRF 보호 대상이 아님(REST API 표준 관행)
+                // 복약자 권한 관리 웹(브라우저)이 다른 주소에서 호출할 수 있게 CORS를 켠다. 허용 주소는 CorsConfig에서 정한다.
+                // 사전 요청(OPTIONS)은 이 설정이 로그인 확인보다 먼저 처리하므로 OPTIONS를 따로 열어 주지 않는다
+                .cors(Customizer.withDefaults())
+                .httpBasic(AbstractHttpConfigurer::disable)
+                .formLogin(AbstractHttpConfigurer::disable)
+                // 세션을 만들지 않는다 - 모든 인증 상태는 매 요청의 Access Token으로만 판단(무상태)
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .exceptionHandling(ex -> ex.authenticationEntryPoint(jwtAuthenticationEntryPoint))
+                .authorizeHttpRequests(auth -> auth
+                        // 공개 엔드포인트만 명시적으로 허용 - "/auth/**" 블랭킷 허용 금지
+                        .requestMatchers(HttpMethod.POST, "/auth/signup", "/auth/login", "/auth/refresh", "/auth/logout").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/auth/check-id").permitAll()
+                        // 회원가입용 문자 인증 - 아직 계정이 없으므로 로그인 없이 호출한다
+                        .requestMatchers(HttpMethod.POST, "/auth/phone-verifications", "/auth/phone-verifications/*/confirm").permitAll()
+                        // 아이디 찾기·비밀번호 재설정 - 로그인할 수 없는 사람이 쓰므로 공개. 대신 가입용 문자 인증의 증표(verification_token)를
+                        // 반드시 요구해서 "그 번호가 지금 내 손에 있다"를 확인한다 (AccountRecoveryService)
+                        .requestMatchers(HttpMethod.POST, "/auth/find-id", "/auth/password-reset").permitAll()
+                        // 약관 본문 조회 - 회원가입 화면에서 로그인 전에 호출해야 하므로 공개
+                        .requestMatchers(HttpMethod.GET, "/terms").permitAll()
+                        // 문자 인증 철회 - 앱 계정이 없는 복약자는 로그인할 수 없으므로 공개
+                        .requestMatchers(HttpMethod.POST, "/revocations/request", "/revocations/confirm").permitAll()
+                        // 약통(기기)이 보내는 요청 - 사람의 로그인 토큰이 없어서 JWT 대신 기기의 시리얼번호·비밀값
+                        // 헤더로 인증한다 (DeviceAuthService). 기기용 경로는 새로 만들 때마다 여기에 하나씩 추가한다
+                        .requestMatchers(HttpMethod.POST, "/device/heartbeat", "/device/signals").permitAll()
+                        // 앞으로 patient/medication 등 새 컨트롤러를 추가해도 기본은 "인증 필요" -
+                        // 개별 엔드포인트를 열어주려면 여기에 명시적으로 추가해야 하므로,
+                        // "깜빡하고 인증 없이 노출"되는 실수를 구조적으로 막는다.
+                        .requestMatchers(HttpMethod.POST, "/device/compartment-state").permitAll()
+                        .anyRequest().authenticated()
+                )
+                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+
+        return http.build();
+    }
+
+    /**
+     * 비어 있는 사용자 저장소. 로그인은 JWT로만 하는데, 이 빈이 없으면 스프링 부트가 기본 계정(user)과
+     * 임시 비밀번호를 만들어 서버를 켤 때마다 로그에 찍는다. 쓰이지 않는 계정을 아예 만들지 않으려고 직접 정의한다.
+     */
+    @Bean
+    public UserDetailsService emptyUserDetailsService() {
+        return new InMemoryUserDetailsManager(List.of());
+    }
+}

@@ -1,0 +1,163 @@
+package com.gamcho.yakyeon.common.exception;
+
+import org.springframework.http.HttpStatus;
+
+/**
+ * 비즈니스 로직에서 발생하는 예외 코드 모음.
+ * REST API 명세 §0 공통 에러 응답 포맷({ code, message })의 code 값으로 사용된다.
+ */
+public enum ErrorCode {
+
+    DUPLICATE_LOGIN_ID(HttpStatus.CONFLICT, "이미 사용 중인 아이디입니다."),
+    PASSWORD_MISMATCH(HttpStatus.BAD_REQUEST, "비밀번호와 비밀번호 확인이 일치하지 않습니다."),
+    INVALID_ACCOUNT_TYPE(HttpStatus.BAD_REQUEST, "계정 유형은 PATIENT 또는 GUARDIAN만 가능합니다."),
+    USER_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 계정입니다."),
+    /** 아이디 찾기·비밀번호 재설정에서 입력한 정보와 맞는 계정이 없음 (없는 아이디, 다른 번호, 다른 이름을 구분하지 않는다) */
+    ACCOUNT_NOT_FOUND(HttpStatus.NOT_FOUND, "입력하신 정보와 일치하는 계정이 없습니다."),
+
+    // --- 약관 동의 (FR-AUTH-008) ---
+    REQUIRED_TERMS_NOT_AGREED(HttpStatus.BAD_REQUEST, "필수 약관에 모두 동의해야 가입할 수 있습니다."),
+    TERMS_VERSION_OUTDATED(HttpStatus.CONFLICT, "약관 내용이 갱신되었습니다. 최신 약관을 다시 확인해주세요."),
+    TERMS_NOT_CONFIGURED(HttpStatus.INTERNAL_SERVER_ERROR, "약관 데이터가 설정되지 않았습니다. 관리자에게 문의해주세요."),
+
+    // --- 로그인/토큰 (FR-AUTH-005~007) ---
+    /** 아이디가 없거나 비밀번호가 틀렸거나 - 둘을 구분해서 알려주지 않는다 (계정 존재 여부 비노출) */
+    INVALID_CREDENTIALS(HttpStatus.UNAUTHORIZED, "아이디 또는 비밀번호가 올바르지 않습니다."),
+    /** 비밀번호를 연속으로 틀려 계정이 잠시 잠김 (잠긴 동안은 비밀번호가 맞아도 거절) */
+    LOGIN_LOCKED(HttpStatus.TOO_MANY_REQUESTS, "로그인 시도가 너무 많아 잠시 잠겼습니다. 잠시 후 다시 시도해주세요."),
+    INVALID_REFRESH_TOKEN(HttpStatus.UNAUTHORIZED, "유효하지 않거나 만료된 토큰입니다. 다시 로그인해주세요."),
+    REFRESH_TOKEN_REUSED(HttpStatus.UNAUTHORIZED, "비정상적인 접근이 감지되어 모든 로그인이 종료되었습니다. 다시 로그인해주세요."),
+
+    // --- 비밀번호 변경 / 계정 삭제 ---
+    CURRENT_PASSWORD_MISMATCH(HttpStatus.UNAUTHORIZED, "현재 비밀번호가 올바르지 않습니다."),
+
+    // --- 복약자 등록 (FR-AUTH-009, 011, 018) ---
+    PATIENT_ALREADY_REGISTERED(HttpStatus.CONFLICT, "이미 본인 복약자 프로필이 등록되어 있습니다."),
+    PATIENT_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 복약자입니다."),
+    INVALID_PHONE_FORMAT(HttpStatus.BAD_REQUEST, "휴대폰 번호 형식이 올바르지 않습니다. (예: 01012345678)"),
+
+    // --- 보호자 대리 동의 (FR-AUTH-009~015) ---
+    GUARDIAN_ONLY(HttpStatus.FORBIDDEN, "보호자(GUARDIAN) 계정만 사용할 수 있는 기능입니다."),
+    GUARDIAN_LINK_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 연동 요청입니다."),
+    GUARDIAN_LINK_ALREADY_EXISTS(HttpStatus.CONFLICT, "이미 대기 중이거나 연동된 요청이 있습니다."),
+    GUARDIAN_LINK_NOT_PENDING(HttpStatus.CONFLICT, "동의 대기 중인 연동 요청이 아닙니다."),
+    GUARDIAN_LINK_NOT_ACTIVE(HttpStatus.CONFLICT, "연동 중인 상태가 아닙니다."),
+    PERMISSION_UPGRADE_FORBIDDEN(HttpStatus.FORBIDDEN, "권한 범위를 넓히는 것은 복약자 본인만 할 수 있습니다."),
+    INSUFFICIENT_PERMISSION(HttpStatus.FORBIDDEN, "이 복약자의 데이터에 대해 해당 작업을 할 권한이 없습니다."),
+    /** 설정(features.*)으로 꺼 둔 기능. 없는 주소처럼 보이게 404로 응답한다 */
+    FEATURE_DISABLED(HttpStatus.NOT_FOUND, "사용할 수 없는 기능입니다."),
+    /** 약 등록 전 복약정보 동의, 약통 등록 전 약통 연결 동의, 또는 필수 동의(이용약관·개인정보·건강정보) 철회 */
+    CONSENT_REQUIRED(HttpStatus.FORBIDDEN, "필요한 동의가 없습니다. 동의한 뒤 다시 시도해주세요."),
+    TERMS_VERSION_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 약관 버전입니다."),
+    TERMS_TYPE_NOT_SUPPORTED(HttpStatus.BAD_REQUEST, "이 약관은 이 기능으로 동의하거나 철회할 수 없습니다."),
+
+    // --- 약물 검색 ---
+    INVALID_SEARCH_QUERY(HttpStatus.BAD_REQUEST, "검색어가 너무 깁니다. 50자 이하로 입력해주세요."),
+
+    // --- 처방·약물 등록 ---
+    DRUG_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 약물입니다."),
+    /** 없는 약이거나, 남의 약이거나, 이미 삭제된 약. 셋을 구분해서 알려주면 "이 번호의 약이 존재한다"는 정보가 새므로 같은 응답을 쓴다 */
+    MEDICATION_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 약물 정보입니다."),
+
+    // --- 처방전 이미지 ---
+    INVALID_IMAGE(HttpStatus.BAD_REQUEST, "올바른 이미지 파일이 아닙니다. JPEG 또는 PNG 이미지를 올려주세요."),
+    /** 413. 스프링 버전에 따라 상수 이름이 다르므로(PAYLOAD_TOO_LARGE / CONTENT_TOO_LARGE) 숫자로 만든다 */
+    IMAGE_TOO_LARGE(HttpStatus.valueOf(413), "이미지가 너무 큽니다. 8MB 이하로 올려주세요."),
+    /** 처방전 인식 엔진(외부 OCR)을 지금 쓸 수 없음: 연결 실패, 시간 초과, 호출 한도, 엔진 오류 */
+    OCR_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "처방전 인식을 지금 사용할 수 없습니다. 잠시 후 다시 시도하거나 약을 직접 입력해주세요."),
+    /** 약 항목의 값이 규칙에 맞지 않음. 어느 약의 어떤 필드인지는 상황별 메시지로 알려준다 */
+    INVALID_MEDICATION(HttpStatus.BAD_REQUEST, "약물 정보가 올바르지 않습니다."),
+
+    // --- 문자 인증 ---
+    LEGAL_REP_PHONE_REQUIRED(HttpStatus.BAD_REQUEST, "만 14세 미만 복약자는 법정대리인 휴대폰 번호가 필요합니다."),
+    LEGAL_REP_NAME_REQUIRED(HttpStatus.BAD_REQUEST, "만 14세 미만 복약자는 동의 시 법정대리인 이름이 필요합니다."),
+    LEGAL_REP_PHONE_SAME_AS_PATIENT(HttpStatus.BAD_REQUEST, "법정대리인 휴대폰 번호는 복약자 본인 번호와 달라야 합니다."),
+    /** 만 14세 미만 복약자가 웹에서 스스로 열람 범위에 동의하려 함 (법정대리인 동의가 필요) */
+    LEGAL_REP_REQUIRED(HttpStatus.FORBIDDEN, "만 14세 미만은 법정대리인의 동의가 필요해서 이 화면에서는 동의할 수 없습니다."),
+    /** 복약자 웹 동의: 복약자 전용 기능을 보호자 계정이 호출 */
+    PATIENT_ONLY(HttpStatus.FORBIDDEN, "복약자 계정만 사용할 수 있는 기능입니다."),
+    /** 대리인 아이디가 없거나, 보호자 계정이 아니거나, 탈퇴한 계정 (셋을 구분하지 않는다) */
+    GUARDIAN_NOT_FOUND(HttpStatus.NOT_FOUND, "대리인(보호자)을 찾을 수 없습니다. 아이디를 확인해주세요."),
+    /** 보호자가 복약자가 공유를 허용하지 않은 항목에 접근함 (복약자 웹 동의의 열람 범위) */
+    SHARE_NOT_GRANTED(HttpStatus.FORBIDDEN, "복약자가 공유를 허용하지 않은 정보입니다."),
+    /** 열람 범위 변경에서 필수 3개 항목을 비동의로 바꾸려 함 */
+    REQUIRED_CONSENT_ITEM(HttpStatus.BAD_REQUEST, "필수 항목은 동의 상태를 바꿀 수 없습니다. 연동을 끊으려면 연동 해제를 사용해주세요."),
+    VERIFICATION_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 인증 요청입니다."),
+    VERIFICATION_EXPIRED(HttpStatus.BAD_REQUEST, "인증 시간이 만료되었습니다. 인증번호를 다시 요청해주세요."),
+    VERIFICATION_ATTEMPTS_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS, "인증번호 입력 가능 횟수를 초과했습니다. 인증번호를 다시 요청해주세요."),
+    VERIFICATION_RATE_LIMITED(HttpStatus.TOO_MANY_REQUESTS, "인증번호 요청이 너무 많습니다. 잠시 후 다시 시도해주세요."),
+    /** 문자 인증 업체(OCTOMO)에 연결하지 못했거나 하루 호출 한도를 넘음 */
+    VERIFICATION_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "문자 인증을 지금 사용할 수 없습니다. 잠시 후 다시 시도해주세요."),
+    /** 같은 접속 주소가 짧은 시간에 너무 많이 요청함 (공개 API 호출 제한) */
+    RATE_LIMITED(HttpStatus.TOO_MANY_REQUESTS, "요청이 너무 많습니다. 잠시 후 다시 시도해주세요."),
+    VERIFICATION_REQUIRED(HttpStatus.BAD_REQUEST, "동의하려면 문자 인증이 필요합니다."),
+    VERIFICATION_NOT_COMPLETED(HttpStatus.BAD_REQUEST, "문자 인증이 완료되지 않았습니다."),
+    VERIFICATION_PURPOSE_MISMATCH(HttpStatus.BAD_REQUEST, "이 동의에 사용할 수 없는 인증입니다."),
+
+    // --- 회원가입 계정 프로필 / 가입용 문자 인증 ---
+    DUPLICATE_PHONE(HttpStatus.CONFLICT, "이미 가입된 휴대폰 번호입니다."),
+    VERIFICATION_ALREADY_COMPLETED(HttpStatus.CONFLICT, "이미 인증이 완료된 요청입니다. 가입을 계속 진행해주세요."),
+
+    // --- 병용금기 ---
+    INTERACTION_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 병용금기 정보입니다."),
+
+    // --- 복용 종료 ---
+    MEDICATION_ALREADY_ENDED(HttpStatus.CONFLICT, "이미 복용이 끝난 약입니다."),
+    MEDICATION_NOT_STARTED(HttpStatus.CONFLICT, "아직 복용을 시작하지 않은 약은 종료할 수 없습니다. 삭제해주세요."),
+    PRESCRIPTION_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 처방 정보입니다."),
+    PRESCRIPTION_ALREADY_ENDED(HttpStatus.CONFLICT, "이미 복용이 끝난 약봉지입니다."),
+
+    // --- 복용 시각 설정 ---
+    INVALID_SCHEDULE(HttpStatus.BAD_REQUEST, "복용 시각이 올바르지 않습니다."),
+    SCHEDULE_CONFLICT(HttpStatus.CONFLICT, "다른 곳에서 동시에 복용 시각을 바꾸고 있습니다. 잠시 후 다시 시도해주세요."),
+
+    // --- 복용 일정 조회 ---
+    INVALID_QUERY(HttpStatus.BAD_REQUEST, "조회 조건이 올바르지 않습니다."),
+
+    // --- 복용 기록·정정 ---
+    DOSE_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 복용 예정입니다."),
+    DOSE_EXPIRED(HttpStatus.CONFLICT, "당일 기록만 바꿀 수 있습니다. 지난 날의 복용 기록은 수정할 수 없습니다."),
+    DOSE_NOT_DECIDED(HttpStatus.CONFLICT, "아직 기록이 없는 복용 예정입니다."),
+    INVALID_TAKEN_AT(HttpStatus.BAD_REQUEST, "복용 시각이 올바르지 않습니다."),
+    DOSE_RECORD_FAILED(HttpStatus.CONFLICT, "복용 기록을 처리하지 못했습니다. 잠시 후 다시 시도해주세요."),
+
+    // --- 약통 ---
+    DEVICE_NOT_FOUND(HttpStatus.NOT_FOUND, "등록된 약통이 없습니다."),
+    DEVICE_ALREADY_REGISTERED(HttpStatus.CONFLICT, "이미 등록된 약통이 있습니다. 먼저 해제해주세요."),
+    DEVICE_SERIAL_IN_USE(HttpStatus.CONFLICT, "이미 다른 복약자에게 등록된 약통입니다."),
+    /** 출고 약통 목록에 없는 시리얼이거나 비밀값이 틀림 (둘을 구분해서 알려 주지 않는다) */
+    DEVICE_CREDENTIALS_INVALID(HttpStatus.BAD_REQUEST, "시리얼번호 또는 비밀값이 올바르지 않습니다. 약통 하단 라벨을 확인해주세요."),
+    DEVICE_AUTH_FAILED(HttpStatus.UNAUTHORIZED, "기기 인증에 실패했습니다."),
+
+    // --- 약통 칸 배정 ---
+    COMPARTMENT_MAPPING_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 칸 배정입니다."),
+    COMPARTMENT_OCCUPIED(HttpStatus.CONFLICT, "이미 다른 약봉지가 배정된 칸입니다."),
+    PRESCRIPTION_ALREADY_ASSIGNED(HttpStatus.CONFLICT, "이미 약통 칸에 배정된 약봉지입니다."),
+    INVALID_COMPARTMENT_NO(HttpStatus.BAD_REQUEST, "이 약통에 없는 칸 번호입니다."),
+    MAPPING_NOT_PENDING_LOAD(HttpStatus.CONFLICT, "이미 충전이 확인된 칸입니다."),
+    MAPPING_NOT_ACTIVE(HttpStatus.CONFLICT, "충전이 확인된 칸만 추가로 채울 수 있습니다."),
+    MAPPING_ALREADY_ENDED(HttpStatus.CONFLICT, "이미 해제된 칸 배정입니다."),
+
+    // --- 약통 신호 ---
+    INVALID_SIGNAL(HttpStatus.BAD_REQUEST, "약통 신호의 내용이 올바르지 않습니다."),
+
+    // --- 알림 ---
+    NOTIFICATION_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 알림입니다."),
+    INVALID_NOTIFICATION_SETTING(HttpStatus.BAD_REQUEST, "알림 설정 요청이 올바르지 않습니다.");
+
+    private final HttpStatus status;
+    private final String defaultMessage;
+
+    ErrorCode(HttpStatus status, String defaultMessage) {
+        this.status = status;
+        this.defaultMessage = defaultMessage;
+    }
+
+    public HttpStatus getStatus() {
+        return status;
+    }
+
+    public String getDefaultMessage() {
+        return defaultMessage;
+    }
+}
